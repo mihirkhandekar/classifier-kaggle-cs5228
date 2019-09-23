@@ -6,12 +6,12 @@ from keras.preprocessing import sequence
 from keras.models import Sequential, Model
 from keras.layers import Dense, Dropout, Embedding, LSTM, Bidirectional, Input, BatchNormalization, Conv1D, Multiply, Activation
 
-prefix_path = '/kaggle/input/1910-cs5228-knowledge-discovery-and-data-mining'
+prefix_path = '/home/m/mihir/cs5228/data'
 labels = pd.read_csv(prefix_path + '/train_kaggle.csv')
 print('Labels', labels.describe())
 X = []
 y = []
-limit = 100
+
 max_len = 1000
 batch_size = 50
 for index, train_label in labels.iterrows():
@@ -20,9 +20,6 @@ for index, train_label in labels.iterrows():
 	zeros_array[0:len(features)] = features
 	X.append(zeros_array)
 	y.append(train_label['label'])
-	limit = limit - 1
-	if limit == 0:
-		break
 	
 X = np.nan_to_num(np.array(X))
 y = np.array(y)
