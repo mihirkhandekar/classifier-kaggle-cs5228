@@ -20,9 +20,9 @@ batch_size = 500
 for index, train_label in labels.iterrows():
 	label = train_label['label']
     if label == 0:
-            ones -= 1
+        ones -= 1
     if ones == 0:
-            break
+        break
     zeros_array = np.zeros((max_len, 40))
     features = np.load(prefix_path + '/train/train/' + str(train_label['Id']) + '.npy')
 	zeros_array[0:len(features)] = features
