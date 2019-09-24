@@ -18,13 +18,13 @@ ones = len(labels.loc[labels['label']==1])
 max_len = 400
 batch_size = 500
 for index, train_label in labels.iterrows():
-	zeros_array = np.zeros((max_len, 40))
 	label = train_label['label']
-        if label == 0:
+    if label == 0:
             ones -= 1
-        if ones == 0:
+    if ones == 0:
             break
-        features = np.load(prefix_path + '/train/train/' + str(train_label['Id']) + '.npy')
+    zeros_array = np.zeros((max_len, 40))
+    features = np.load(prefix_path + '/train/train/' + str(train_label['Id']) + '.npy')
 	zeros_array[0:len(features)] = features
 	X.append(zeros_array)
 	y.append(label)
