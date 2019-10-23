@@ -45,7 +45,7 @@ max_len = 336
 batch_size = 128
 train_samples = 30336
 test_samples = 10000
-no_epochs = 88
+no_epochs = 15
 max_time = 60
 deleted_cols = [2]
 
@@ -101,9 +101,16 @@ X_train, X_val, Y_train, Y_val = train_test_split(
 print("Split set shapes", X_train.shape,
       Y_train.shape, X_val.shape, Y_val.shape)
 
+print('Creating batches')
+bar = progressbar.ProgressBar(maxval=no_epochs,
+                              widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
 
-def generate_data(x_data, y_data, b_size):
-    while True:
+
+bar.start()
+
+def create_batches(x_data, y_data, b_size):
+    batches = []
+    for it in range(no_epochs):
         shuffle(x_data, y_data)
         max_ones = np.sum(y_data[:, 0])
         one_count = 0
@@ -118,7 +125,17 @@ def generate_data(x_data, y_data, b_size):
             y_batch.append(y_data[index])
             if index >= b_size:
                 break
-        yield np.array(x_batch), np.array(y_batch)
+        batches.append((np.array(x_batch), np.array(y_batch)))
+        bar.update(it+1)
+bar.finish()
+
+batches = create_batches(X_train, Y_train, batch_size)
+
+def generate_data(x_data, y_data, b_size):
+    i = 0
+    while True:
+        yield batches[i % b_size][0], batches[i % b_size][1]
+        i = i + 1
 
 
 def get_model():
@@ -224,7 +241,7 @@ early_stopping = EarlyStopping(
 model.fit_generator(
     generator2,
     steps_per_epoch=math.ceil(len(X_train) / batch_size),
-    epochs=15,  # no_epochs,
+    epochs=no_epochs,
     shuffle=True,
     # class_weight=class_weights,
     verbose=1,
