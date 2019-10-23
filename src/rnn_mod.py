@@ -122,28 +122,28 @@ def generate_data(x_data, y_data, b_size):
         
 
 def get_model():
-    data_input = Input(shape=(None, 35))
+    data_input = Input(shape=(None, 39))
 
     X = BatchNormalization()(data_input)
 
-    #sig_conv = Conv1D(128, (1), activation='sigmoid', padding='same', kernel_regularizer=regularizers.l2(0.0005))(X)
-    #rel_conv = Conv1D(128, (1), activation='relu', padding='same', kernel_regularizer=regularizers.l2(0.0005))(X)
-    #a = Multiply()([sig_conv, rel_conv])
+    sig_conv = Conv1D(128, (1), activation='sigmoid', padding='same', kernel_regularizer=regularizers.l2(0.0005))(X)
+    rel_conv = Conv1D(128, (1), activation='relu', padding='same', kernel_regularizer=regularizers.l2(0.0005))(X)
+    a = Multiply()([sig_conv, rel_conv])
     # print(X)
 
-    # b_sig = Conv1D(filters=128, kernel_size=(5), strides=1, kernel_regularizer=regularizers.l2(0.0005), activation="sigmoid",
-    #               padding="same")(X)
-    # b_relu = Conv1D(filters=128, kernel_size=(5), strides=1, kernel_regularizer=regularizers.l2(0.0005), activation="relu",
-    #               padding="same")(X)
-    #b = Multiply()([b_sig, b_relu])
+     b_sig = Conv1D(filters=128, kernel_size=(5), strides=1, kernel_regularizer=regularizers.l2(0.0005), activation="sigmoid",
+                   padding="same")(X)
+     b_relu = Conv1D(filters=128, kernel_size=(5), strides=1, kernel_regularizer=regularizers.l2(0.0005), activation="relu",
+                   padding="same")(X)
+    b = Multiply()([b_sig, b_relu])
 
-    #X = Concatenate()([a, b])
+    X = Concatenate()([a, b])
     #X = BatchNormalization()(X)
     X1 = Bidirectional(LSTM(256))(X)
     X = Activation("relu")(X1)
-    X2 = Bidirectional(LSTM(128))(X)
-    X2 = Activation("relu")(X2)
-    X = Concatenate()([X1, X2])
+    #X2 = Bidirectional(LSTM(128))(X)
+    #X2 = Activation("relu")(X2)
+    #X = Concatenate()([X1, X2])
 
     X = Dense(256, activation='relu',
               kernel_regularizer=regularizers.l2(0.0005))(X)
@@ -215,14 +215,14 @@ terminate_on_nan = TerminateOnNaN()
 model_checkpoint = ModelCheckpoint(
     "cp1", monitor='loss', save_best_only=True, mode='min')
 early_stopping = EarlyStopping(
-    monitor='val_accuracy', patience=12, mode='auto')
+    monitor='val_accuracy', patience=6, mode='auto')
 
 #class_weights = class_weight.compute_class_weight('balanced', np.unique(Y_train), Y_train)
 
 model.fit_generator(
     generator2,
     steps_per_epoch=math.ceil(len(X_train) / batch_size),
-    epochs=20,  # no_epochs,
+    epochs=40,  # no_epochs,
     shuffle=True,
     # class_weight=class_weights,
     verbose=1,
