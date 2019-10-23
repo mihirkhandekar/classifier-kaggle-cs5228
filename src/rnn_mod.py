@@ -119,22 +119,24 @@ def generate_data(x_data, y_data, b_size):
             if index >= b_size:
                 break
         yield x_batch, y_batch
-        
+
 
 def get_model():
     data_input = Input(shape=(None, 39))
 
     X = BatchNormalization()(data_input)
 
-    sig_conv = Conv1D(128, (1), activation='sigmoid', padding='same', kernel_regularizer=regularizers.l2(0.0005))(X)
-    rel_conv = Conv1D(128, (1), activation='relu', padding='same', kernel_regularizer=regularizers.l2(0.0005))(X)
+    sig_conv = Conv1D(128, (1), activation='sigmoid', padding='same',
+                      kernel_regularizer=regularizers.l2(0.0005))(X)
+    rel_conv = Conv1D(128, (1), activation='relu', padding='same',
+                      kernel_regularizer=regularizers.l2(0.0005))(X)
     a = Multiply()([sig_conv, rel_conv])
     # print(X)
 
-     b_sig = Conv1D(filters=128, kernel_size=(5), strides=1, kernel_regularizer=regularizers.l2(0.0005), activation="sigmoid",
-                   padding="same")(X)
-     b_relu = Conv1D(filters=128, kernel_size=(5), strides=1, kernel_regularizer=regularizers.l2(0.0005), activation="relu",
-                   padding="same")(X)
+    b_sig = Conv1D(filters=128, kernel_size=(5), strides=1, kernel_regularizer=regularizers.l2(
+        0.0005), activation="sigmoid", padding="same")(X)
+    b_relu = Conv1D(filters=128, kernel_size=(5), strides=1, kernel_regularizer=regularizers.l2(
+        0.0005), activation="relu", padding="same")(X)
     b = Multiply()([b_sig, b_relu])
 
     X = Concatenate()([a, b])
@@ -237,37 +239,26 @@ print("EVALUATION loss:", loss, "accuracy:", accuracy, "f1_score:", f1_score, "p
 '''
     STEP 4 : Prepare test samples
 '''
+
+print("Starting test - ")
 X_test = []
 for i in range(0, test_samples):
     data = np.load("data/test/test/" + str(i) + ".npy")
-    zero_mat = np.zeros((max_time, 40))
-    zero_mat[:data.shape[0], :] = data[:min(max_time, data.shape[0]), :]
-    df1 = pd.DataFrame(data=zero_mat)
-    for feature in range(40):
-        #    average_value = np.nanmean(zero_mat[:, feature])
-        # zero_mat[:, feature]= np.nan_to_num(zero_mat[:, feature], nan=average_value)
-        #    zero_mat[:, feature] = np.nan_to_num(zero_mat[:, feature], nan=0)
-        mod = df1[feature].median()
-        df1[feature].fillna(mod, inplace=True)
+    col_mean = np.nanmean(data, axis=0)
+    inds = np.where(np.isnan(data))
+    data[inds] = np.take(col_mean, inds[1])
 
-    zero_mat = np.array(df1)
-    zero_mat = np.delete(zero_mat, deleted_cols, axis=1)
-    # df1 = pd.DataFrame(data=zero_mat)
-    # zero_mat = df1.fillna(method='bfill')
-    # 11, 33, 35
-    # 1,3, 4, 15, 17,  22, 24, 36
-    # 1, 3, 4, 6, 8, 15, 17, 18, 20, 22, 23, 24, 29, 31, 36
-    # df1 = pd.DataFrame(data=X_t[index])
-    # median = df1[feature].mode()
-    # df1[feature].fillna(median, inplace=True)
+    data = np.delete(data, deleted_cols, axis=1)
 
-    X_test.append(np.array(zero_mat))
+    zero_mat = np.zeros((max_time, data.shape[1]))
+    zero_mat[:min(max_time, data.shape[0]),
+             :] = data[:min(max_time, data.shape[0]), :]
+    X_test.append(zero_mat)
 
 X_test = np.nan_to_num(np.array(X_test))
 print(X_test.shape)
-# model = load_model("cp1")
-# model = load_model("cp1")
 
+print("Predicting test data")
 pred = model.predict(X_test)
 print(pred.shape, pred)
 p = pd.DataFrame()
