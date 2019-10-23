@@ -119,8 +119,8 @@ for it in range(iterations):
     print('y_test shape', y_test.shape)
     
     print('Starting XGB training')
-    from xgboost import XGBClassifier
-    model = XGBClassifier()
+    from xgboost import XGBRegressor
+    model = XGBRegressor(n_estimators=200, max_depth=8, objective="binary:logistic", silent=False)
     model.fit(x_train, y_train)
     
     y_pred = model.predict(x_test)
@@ -140,9 +140,9 @@ final_y = np.average(test_set_results, axis=0)
 print(final_y.shape, final_y)
 final_y = [round(value) for value in final_y]
 
-indices = np.array([i for i in range(10000)])
+#indices = np.array([i for i in range(10000)])
 #print(indices.T.shape, test_Y.shape)
-np.savetxt("output.csv", final_y, delimiter=",")
+#np.savetxt("output.csv", final_y, delimiter=",")
 import pandas as pd
 df = pd.DataFrame()
 df["Predicted"] = final_y

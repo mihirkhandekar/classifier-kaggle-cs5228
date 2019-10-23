@@ -8,7 +8,7 @@ from keras.models import Sequential, Model
 from keras.layers import Dense, Dropout, Embedding, LSTM, Bidirectional, Input, BatchNormalization, Conv1D, Conv2D, Multiply, Activation, MaxPooling1D
 from keras.regularizers import l2
 from keras.optimizers import Adam, SGD
-from keras.wrappers.scikit_learn import KerasClassifier
+from keras.wrappers.scikit_learn import KerasClassifier, KerasRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.utils import shuffle
 from sklearn.metrics import accuracy_score
@@ -106,8 +106,8 @@ for it in range(iterations):
     print('y_test shape', y_test.shape)
     
     print('Starting XGB training')
-    from xgboost import XGBClassifier
-    model = XGBClassifier()
+    from xgboost import XGBRegressor
+    model = XGBRegressor()
     model.fit(x_train, y_train)
     
     y_pred = model.predict(x_test)
@@ -125,7 +125,6 @@ print('Results', test_set_results.shape)
 
 final_y = np.average(test_set_results, axis=0)
 print(final_y.shape, final_y)
-final_y = [round(value) for value in final_y]
 
 indices = np.array([i for i in range(10000)])
 #print(indices.T.shape, test_Y.shape)

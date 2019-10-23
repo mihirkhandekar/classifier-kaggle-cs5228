@@ -1,29 +1,27 @@
+import math
 import os
+import sys
+
+import keras.backend as K
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import math
-import matplotlib.pyplot as plt
-from keras import regularizers
-from sklearn.model_selection import train_test_split
-from keras.models import load_model
-
-from sklearn.utils import class_weight
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import roc_auc_score
-from sklearn.metrics import roc_curve
-
-
+import progressbar
 import tensorflow as tf
-import keras.backend as K
+from keras import regularizers
+from keras.callbacks.callbacks import (EarlyStopping, LearningRateScheduler,
+                                       ModelCheckpoint, ReduceLROnPlateau,
+                                       TerminateOnNaN)
+from keras.layers import (LSTM, Activation, BatchNormalization, Bidirectional,
+                          Concatenate, Conv1D, Dense, Dropout, Embedding,
+                          GlobalMaxPooling1D, Input, MaxPooling1D, Multiply)
+from keras.models import Model, Sequential, load_model
+from keras.optimizers import SGD, Adam
 from keras.preprocessing import sequence
-from keras.models import Sequential, Model
-from keras.layers import Concatenate, Dense, Dropout, Embedding, LSTM, Bidirectional, GlobalMaxPooling1D, Input, \
-    BatchNormalization, Conv1D, Multiply, Activation, MaxPooling1D
 from keras.regularizers import l2
-from keras.optimizers import Adam, SGD
-
-from keras.callbacks.callbacks import TerminateOnNaN, ModelCheckpoint, LearningRateScheduler, ReduceLROnPlateau, \
-    EarlyStopping
+from sklearn.metrics import accuracy_score, roc_auc_score, roc_curve
+from sklearn.model_selection import train_test_split
+from sklearn.utils import class_weight, shuffle
 
 
 def classification_evaluation(y_ture, y_pred):
@@ -43,97 +41,85 @@ def classification_evaluation(y_ture, y_pred):
 
 plt.style.use('seaborn')
 
-max_len = 340
-# 336
-batch_size = 64
-# 128
+max_len = 336
+batch_size = 256
 train_samples = 30336
-# 30336
 test_samples = 10000
-# 10000
 no_epochs = 88
+max_time = 60
+deleted_cols = [2]
 
 print('Reading labels CSV')
-labels = pd.read_csv("data/train_kaggle.csv")
-#i = Dense(64, activation='relu', kernel_regularizer=regularizers.l2(0.0005))(X)
+labels = pd.read_csv("train_kaggle.csv")
 ones = len(labels.loc[labels['label'] == 1])
-zeros = ones
+zeros = len(labels.loc[labels['label'] == 0])
 X_t = []
 y_t = []
 print('Ones, zeros', ones, zeros)
 
+bar = progressbar.ProgressBar(maxval=len(labels),
+                              widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
+
+
+bar.start()
+print("Reading and preprocessing data...")
 for index, train_label in labels.iterrows():
     label = train_label['label']
-    zero_mat = np.zeros((50, 40))
-    data = np.load("data/train/train/" + str(train_label['Id']) + '.npy')
-    zero_mat[:data.shape[0], :] = data[:min(50, data.shape[0]), :]
+    data = np.load("train/train/" + str(train_label['Id']) + '.npy')
+
+    col_mean = np.nanmean(data, axis=0)
+    inds = np.where(np.isnan(data))
+    data[inds] = np.take(col_mean, inds[1])
+
+    data = np.delete(data, deleted_cols, axis=1)
+
+    zero_mat = np.zeros((max_time, data.shape[1]))
+    zero_mat[:min(max_time, data.shape[0]),
+             :] = data[:min(max_time, data.shape[0]), :]
     X_t.append(zero_mat)
     y_t.append(label)
+    bar.update(index+1)
 
-x_sampled = []
-y_sampled = []
+bar.finish()
+
 X_t = np.array(X_t)
 y_t = np.array(y_t)
 
-from sklearn.utils import shuffle
 
-X_t, y_t = shuffle(X_t, y_t, random_state=0)
-print("Stage 1", X_t.shape, y_t.shape)
-# shuffle data
-for index in range(y_t.shape[0]):
-    label = y_t[index]
-    if label == 0 and zeros > 0:
-        ones = ones - 1
-    if (zeros == 0 and label == 0) or (ones == 0 and label == 1):
-        continue
-    df1 = pd.DataFrame(data=X_t[index])
-    # df1.fillna(0, inplace=True)
-    for feature in range(40):
-        # average_value = np.nanmean(X_t[index][:, feature])
-        # print(average_value)
-        # X_t[index][:, feature] = np.nan_to_num(X_t[index][:, feature], nan=average_value)
-        # X_t[index][:, feature] = np.nan_to_num(X_t[index][:, feature], nan=0)
-        # df1 = pd.DataFrame(data=X_t[index])
-        median = df1[feature].median()
-        df1[feature].fillna(median, inplace=True)
-    # df1.fillna(0, inplace=True)
-    m = np.array(df1)
-    m = np.delete(m, [2, 3, 11, 33, 35], axis=1)
-    # df1 = pd.DataFrame(data=m)
-    # df1 = df1.fillna(method='bfill')
+X_t, y_t = shuffle(X_t, y_t)
 
-    x_sampled.append(m)
-    y_sampled.append(y_t[index])
+X = np.nan_to_num(X_t)
+print(y_t)
+y = np.array([y_t.T, (1-y_t).T]).T
+print(y.shape, y)
 
-X = np.nan_to_num(np.array(x_sampled))
-y = np.array(y_sampled)
-y = np.array([y.T, (1-y).T]).T
-print(y)
-print("Stage 2", X.shape, y.shape)
-# model = load_model("cp1")
-# print(y)
-# df = pd.read_csv("data/train_kaggle.csv")
-# Y_t = df[:train_samples]
-# y = Y_t.values
+print("After preprocessing", X.shape, y.shape)
 
-X_train, X_val, Y_train, Y_val = train_test_split(X, y, shuffle=True, test_size=0.15)
+X_train, X_val, Y_train, Y_val = train_test_split(
+    X, y, shuffle=True, test_size=0.15)
 
-# print("Trainig set", X_train, X_val)
-print("Trainig set shapes", X_train.shape, Y_train, X_val.shape, Y_val.shape)
+print("Split set shapes", X_train.shape,
+      Y_train.shape, X_val.shape, Y_val.shape)
 
 
 def generate_data(x_data, y_data, b_size):
-    samples_per_epoch = x_data.shape[0]
-    number_of_batches = samples_per_epoch / b_size
-    counter = 0
-    while 1:
-        x_batch = np.array(x_data[batch_size * counter:batch_size * (counter + 1)])
-        y_batch = np.array(y_data[batch_size * counter:batch_size * (counter + 1)])
-        counter += 1
+    while True:
+        shuffle(x_data, y_data)
+        max_ones = np.sum(y_data[:, 0])
+        one_count = 0
+        x_batch = []
+        y_batch = []
+        for index, data in enumerate(x_data):
+            if y_data[index, 0] == 1:
+                one_count += 1
+            if one_count > max_ones and y_data[index, 0] == 1:
+                continue
+            x_batch.append(data)
+            y_batch.append(y_data[index])
+            if index >= b_size:
+                break
         yield x_batch, y_batch
-
-        if counter >= number_of_batches:
-            counter = 0
+        
 
 def get_model():
     data_input = Input(shape=(None, 35))
@@ -143,11 +129,11 @@ def get_model():
     #sig_conv = Conv1D(128, (1), activation='sigmoid', padding='same', kernel_regularizer=regularizers.l2(0.0005))(X)
     #rel_conv = Conv1D(128, (1), activation='relu', padding='same', kernel_regularizer=regularizers.l2(0.0005))(X)
     #a = Multiply()([sig_conv, rel_conv])
-    #print(X)
+    # print(X)
 
-    #b_sig = Conv1D(filters=128, kernel_size=(5), strides=1, kernel_regularizer=regularizers.l2(0.0005), activation="sigmoid",
+    # b_sig = Conv1D(filters=128, kernel_size=(5), strides=1, kernel_regularizer=regularizers.l2(0.0005), activation="sigmoid",
     #               padding="same")(X)
-    #b_relu = Conv1D(filters=128, kernel_size=(5), strides=1, kernel_regularizer=regularizers.l2(0.0005), activation="relu",
+    # b_relu = Conv1D(filters=128, kernel_size=(5), strides=1, kernel_regularizer=regularizers.l2(0.0005), activation="relu",
     #               padding="same")(X)
     #b = Multiply()([b_sig, b_relu])
 
@@ -159,9 +145,11 @@ def get_model():
     X2 = Activation("relu")(X2)
     X = Concatenate()([X1, X2])
 
-    X = Dense(256, activation='relu', kernel_regularizer=regularizers.l2(0.0005))(X)
+    X = Dense(256, activation='relu',
+              kernel_regularizer=regularizers.l2(0.0005))(X)
     # X = GlobalMaxPooling1D()(X)
-    X = Dense(128, activation='relu', kernel_regularizer=regularizers.l2(0.0005))(X)
+    X = Dense(128, activation='relu',
+              kernel_regularizer=regularizers.l2(0.0005))(X)
     # X = Bidirectional(LSTM(32))(X)
     X = Dropout(0.5)(X)
     X = Dense(2, kernel_regularizer=regularizers.l2(0.0005))(X)
@@ -169,8 +157,10 @@ def get_model():
     model = Model(input=data_input, output=X)
     return model
 
+
 model = get_model()
 print(model.summary())
+
 
 def focal_loss(y_true, y_pred):
     gamma = 2
@@ -180,6 +170,8 @@ def focal_loss(y_true, y_pred):
     focal_scale = tf.multiply(tf.pow(tf.subtract(1.0, y_pred), gamma), alpha)
     focal_loss = tf.multiply(y_true, tf.multiply(focal_scale, log_y_pred))
     return -tf.reduce_sum(focal_loss, axis=-1)
+
+
 '''
     gamma = 2.0
     alpha = 0.5
@@ -190,6 +182,8 @@ def focal_loss(y_true, y_pred):
 '''
 
 # model = load_model("cp1")
+
+
 def recall_m(y_true, y_pred):
     true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
     possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
@@ -215,25 +209,29 @@ model.compile(optimizer=Adam(lr=0.001, decay=1e-8), loss=[focal_loss],
 
 generator2 = generate_data(X_train, Y_train, batch_size)
 
-reduce_lr = ReduceLROnPlateau(monitor='loss', factor=0.1, patience=10, verbose=1, mode='min')
+reduce_lr = ReduceLROnPlateau(
+    monitor='loss', factor=0.1, patience=10, verbose=1, mode='min')
 terminate_on_nan = TerminateOnNaN()
-model_checkpoint = ModelCheckpoint("cp1", monitor='loss', save_best_only=True, mode='min')
-early_stopping = EarlyStopping(monitor='val_accuracy', patience=12, mode='auto')
+model_checkpoint = ModelCheckpoint(
+    "cp1", monitor='loss', save_best_only=True, mode='min')
+early_stopping = EarlyStopping(
+    monitor='val_accuracy', patience=12, mode='auto')
 
 #class_weights = class_weight.compute_class_weight('balanced', np.unique(Y_train), Y_train)
 
 model.fit_generator(
     generator2,
     steps_per_epoch=math.ceil(len(X_train) / batch_size),
-    epochs=20,#no_epochs,
+    epochs=20,  # no_epochs,
     shuffle=True,
-    #class_weight=class_weights,
+    # class_weight=class_weights,
     verbose=1,
     # initial_epoch=86,
     validation_data=(X_val, Y_val),
     callbacks=([model_checkpoint, terminate_on_nan, reduce_lr, early_stopping]))
 
-loss, accuracy, f1_score, precision, recall = model.evaluate(X_val, Y_val, verbose=0)
+loss, accuracy, f1_score, precision, recall = model.evaluate(
+    X_val, Y_val, verbose=0)
 print("EVALUATION loss:", loss, "accuracy:", accuracy, "f1_score:", f1_score, "precision:", precision, "recall:",
       recall)
 '''
@@ -242,8 +240,8 @@ print("EVALUATION loss:", loss, "accuracy:", accuracy, "f1_score:", f1_score, "p
 X_test = []
 for i in range(0, test_samples):
     data = np.load("data/test/test/" + str(i) + ".npy")
-    zero_mat = np.zeros((50, 40))
-    zero_mat[:data.shape[0], :] = data[:min(50, data.shape[0]), :]
+    zero_mat = np.zeros((max_time, 40))
+    zero_mat[:data.shape[0], :] = data[:min(max_time, data.shape[0]), :]
     df1 = pd.DataFrame(data=zero_mat)
     for feature in range(40):
         #    average_value = np.nanmean(zero_mat[:, feature])
@@ -253,7 +251,7 @@ for i in range(0, test_samples):
         df1[feature].fillna(mod, inplace=True)
 
     zero_mat = np.array(df1)
-    zero_mat = np.delete(zero_mat, [2, 3, 11, 33, 35], axis=1)
+    zero_mat = np.delete(zero_mat, deleted_cols, axis=1)
     # df1 = pd.DataFrame(data=zero_mat)
     # zero_mat = df1.fillna(method='bfill')
     # 11, 33, 35
