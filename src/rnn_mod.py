@@ -42,7 +42,7 @@ def classification_evaluation(y_ture, y_pred):
 plt.style.use('seaborn')
 
 max_len = 336
-batch_size = 256
+batch_size = 128
 train_samples = 30336
 test_samples = 10000
 no_epochs = 88
@@ -50,7 +50,7 @@ max_time = 60
 deleted_cols = [2]
 
 print('Reading labels CSV')
-labels = pd.read_csv("train_kaggle.csv")
+labels = pd.read_csv("data/train_kaggle.csv")
 ones = len(labels.loc[labels['label'] == 1])
 zeros = len(labels.loc[labels['label'] == 0])
 X_t = []
@@ -65,7 +65,7 @@ bar.start()
 print("Reading and preprocessing data...")
 for index, train_label in labels.iterrows():
     label = train_label['label']
-    data = np.load("train/train/" + str(train_label['Id']) + '.npy')
+    data = np.load("data/train/train/" + str(train_label['Id']) + '.npy')
 
     col_mean = np.nanmean(data, axis=0)
     inds = np.where(np.isnan(data))
@@ -118,7 +118,7 @@ def generate_data(x_data, y_data, b_size):
             y_batch.append(y_data[index])
             if index >= b_size:
                 break
-        yield x_batch, y_batch
+        yield np.array(x_batch), np.array(y_batch)
 
 
 def get_model():
@@ -224,7 +224,7 @@ early_stopping = EarlyStopping(
 model.fit_generator(
     generator2,
     steps_per_epoch=math.ceil(len(X_train) / batch_size),
-    epochs=40,  # no_epochs,
+    epochs=15,  # no_epochs,
     shuffle=True,
     # class_weight=class_weights,
     verbose=1,
