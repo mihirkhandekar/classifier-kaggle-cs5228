@@ -20,21 +20,27 @@ print('Labels', labels.describe())
 X = []
 y = []
 
+def FocalLoss(y_true, y_pred):
+    gamma = 2
+    alpha = 0.5
+    y_pred = tf.maximum(y_pred, 1e-15)
+    log_y_pred = tf.log(y_pred)
+    focal_scale = tf.multiply(tf.pow(tf.subtract(1.0, y_pred), gamma), alpha)
+    focal_loss = tf.multiply(y_true, tf.multiply(focal_scale, log_y_pred))
+    return -tf.reduce_sum(focal_loss, axis=-1)
+
 
 ## ones count kept to balance number of zeros and ones in data to be equal
 ones = len(labels.loc[labels['label']==1])
 
 max_len = 350
 batch_size = 512
-
+test_zero_X = []
+test_zero_Y = []
 ## For each sample in the file
 for index, train_label in labels.iterrows():
     label = train_label['label']
-    ## Checking below if number of zeros matches total number of ones, then stop adding zeros to data
-    if label == 0 and ones > 0:
-        ones = ones - 1
-    if ones == 0 and label == 0:
-        continue
+
     ## zeros_array used to keep the maximum number of sequences constant to max_len
     zeros_array = np.zeros((max_len, 40))
 
@@ -50,17 +56,27 @@ for index, train_label in labels.iterrows():
         average_value = np.average(zeros_array[:feature][np.nan_to_num(zeros_array[:feature]) != 0])
         zeros_array[:feature] = np.nan_to_num(zeros_array[:feature], average_value)
 
+    ## Checking below if number of zeros matches total number of ones, then stop adding zeros to data
+    if label == 0 and ones > 0:
+        ones = ones - 1
+    if ones == 0 and label == 0:
+        test_zero_X.append(zeros_array)
+        test_zero_Y.append(label)
+        continue
+
     X.append(zeros_array)
     y.append(label)
 
 X = np.nan_to_num(np.array(X))
 y = np.array(y)
+test_zero_X = np.nan_to_num(np.array(test_zero_X))
+test_zero_Y = np.array(test_zero_Y)
 
 print('X Shape', X.shape)
 print('y shape', y.shape)
 
 ## Split into train and test datasets
-x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=4)
+x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=8)
 
 print('X_train Shape', x_train.shape)
 print('X_test shape', x_test.shape)
@@ -78,16 +94,17 @@ data_input = Input(shape=(None, 40))
 # sig_input = Activation('sigmoid')(data_input)
 normalize_input = BatchNormalization()(data_input)
 
-sig_conv = Conv1D(40, (1), activation='sigmoid', padding='same')(normalize_input)
-rel_conv = Conv1D(40, (1), activation='tanh', padding='same')(normalize_input)
-mul_conv = Multiply()([sig_conv, rel_conv])
-
+#sig_conv = Conv1D(40, (1), activation='sigmoid', padding='same')(normalize_input)
+#rel_conv = Conv1D(40, (1), activation='tanh', padding='same')(normalize_input)
+rel_conv = Activation('sigmoid')(normalize_input)
+#mul_conv = Multiply()([sig_conv, rel_conv])
+mul_conv = Multiply()([normalize_input, rel_conv])
 #max_pooling = MaxPooling1D(pool_size=10)(mul_conv)
 #max_pooling = MaxPooling1D(pool_size=4)(data_input)
 
-lstm = Bidirectional(LSTM(64))(mul_conv)
+lstm = Bidirectional(LSTM(32))(mul_conv)
 
-dense_1 = Dense(16, activation='relu')(lstm)
+dense_1 = Dense(32, activation='relu')(lstm)
 #dense_1 = Dropout(0.8)(dense_1)
 dense_2 = Dense(1)(dense_1)
 out = Activation('sigmoid')(dense_2)
@@ -104,8 +121,11 @@ print('Model', model.summary())
 
 model.fit(x_train, y_train,
 		  batch_size=batch_size,
-		  epochs = 22,
+		  epochs = 20,
 		  validation_data=[x_test, y_test])
+
+print('Predicting zeros data')
+print(model.evaluate(test_zero_X, test_zero_Y, batch_size=128))
 
 print('Saving model')
 model_json = model.to_json()
@@ -132,6 +152,8 @@ for fileno in range(10000):
 
     test_X.append(zeros_array)
     
+
+
 print('Predicting test data')
 np.set_printoptions(precision=25)
 test_Y = model.predict(np.nan_to_num(np.array(test_X)))

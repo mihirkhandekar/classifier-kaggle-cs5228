@@ -22,7 +22,7 @@ from keras.regularizers import l2
 from keras import regularizers
 import math
 ## Below path hardcoded. TODO: Change this
-prefix_path = '..'
+prefix_path = '../data'
 
 labels = pd.read_csv(prefix_path + '/train_kaggle.csv')
 
@@ -60,8 +60,8 @@ def f1_m(y_true, y_pred):
 
 def get_model():
     data_input = Input(shape=(None, 35))
-    X = Masking(mask_value=-100, input_shape=(None, 35))(data_input)
-    X = BatchNormalization()(X)
+    #X = Masking(mask_value=-100, input_shape=(None, 35))(data_input)
+    X = BatchNormalization()(data_input)
     X = Bidirectional(LSTM(512))(X)
     # sig_conv = Conv1D(64, (1), activation='sigmoid', padding='same', kernel_regularizer=regularizers.l2(0.0005))(X)
     #rel_conv = Conv1D(64, (1), activation='relu', padding='same', kernel_regularizer=regularizers.l2(0.0005))(X)
@@ -89,7 +89,7 @@ def get_model():
 test_X = []
 for fileno in range(10000):
     ## zeros_array used to keep the maximum number of sequences constant to max_len
-    zeros_array = np.zeros((max_len, 40)) - 100
+    zeros_array = np.zeros((max_len, 40)) #- 100
     # print(zeros_array)
 
     ## features is a (N, 40) matrix
@@ -136,7 +136,7 @@ for it in range(iterations):
         if ones <= 0 and label == 0:
             continue
         ## zeros_array used to keep the maximum number of sequences constant to max_len
-        zeros_array = np.zeros((max_len, 40))
+        zeros_array = np.zeros((max_len, 40))# - 100
 
         ## features is a (N, 40) matrix
         features = np.load(prefix_path + '/train/train/' + str(train_label['Id']) + '.npy')
@@ -180,14 +180,14 @@ for it in range(iterations):
     reduce_lr = ReduceLROnPlateau(monitor='loss', factor=0.1, patience=10, verbose=1, mode='min')
     terminate_on_nan = TerminateOnNaN()
     model_checkpoint = ModelCheckpoint("cp1", monitor='loss', save_best_only=True, mode='min')
-    early_stopping = EarlyStopping(monitor='val_loss', patience=12, mode='auto')
+    early_stopping = EarlyStopping(monitor='accuracy', patience=12, mode='auto')
     class_weights = class_weight.compute_class_weight('balanced', np.unique(y_train), y_train)
     no_epochs = 88
     print('len', len(x_train))
     def get_data():
         yield x_train, y_train
     generator = get_data()
-    model.fit_generator(
+    '''model.fit_generator(
         generator,
         steps_per_epoch=math.ceil(len(x_train) / batch_size),
         epochs=no_epochs,
@@ -196,13 +196,16 @@ for it in range(iterations):
         verbose=1,
         # initial_epoch=86,
         validation_data=(x_test, y_test),
-        callbacks=([model_checkpoint, terminate_on_nan, reduce_lr, early_stopping]))
+        callbacks=([model_checkpoint, terminate_on_nan, reduce_lr, early_stopping]))'''
+    print('NUmber of NaNs', np.count_nonzero(np.isnan(x_train)), np.count_nonzero(np.isnan(y_train)))
+    model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=no_epochs, callbacks=([model_checkpoint, terminate_on_nan, reduce_lr, early_stopping]))
 
     loss, accuracy, f1_score, precision, recall = model.evaluate(x_test, y_test, verbose=0)
     print("EVALUATION loss:", loss, "accuracy:", accuracy, "f1_score:", f1_score, "precision:", precision, "recall:",
           recall)
 
     y_xg_1 = model.predict(test_X)
+    print(x_xg_1)
     test_set_results.append(y_xg_1)
 
 test_set_results = np.array(test_set_results)
@@ -213,14 +216,14 @@ print('Results', test_set_results.shape)
 
 final_y = np.average(test_set_results, axis=0)
 print(final_y.shape, final_y)
-final_y = [round(value) for value in final_y]
+#final_y = [round(value) for value in final_y]
 
 indices = np.array([i for i in range(10000)])
 #print(indices.T.shape, test_Y.shape)
 np.savetxt("output.csv", final_y, delimiter=",")
 import pandas as pd
 df = pd.DataFrame()
-df["Predicted"] = final_y
+df["Predicted"] = final_y.T
 df.to_csv('output-1.csv')
 '''
 # load json and create model
