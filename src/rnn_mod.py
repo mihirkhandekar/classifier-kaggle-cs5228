@@ -46,8 +46,8 @@ batch_size = 128
 train_samples = 30336
 test_samples = 10000
 no_epochs = 15
-max_time = 60
-deleted_cols = [2]
+max_time = 50
+deleted_cols = []
 
 print('Reading labels CSV')
 labels = pd.read_csv("data/train_kaggle.csv")
@@ -102,6 +102,8 @@ print("Split set shapes", X_train.shape,
       Y_train.shape, X_val.shape, Y_val.shape)
 
 print('Creating batches')
+
+
 bar = progressbar.ProgressBar(maxval=no_epochs,
                               widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
 
@@ -111,35 +113,40 @@ bar.start()
 def create_batches(x_data, y_data, b_size):
     batches = []
     for it in range(no_epochs):
-        shuffle(x_data, y_data)
+        x_data, y_data = shuffle(x_data, y_data)
+        
         max_ones = np.sum(y_data[:, 0])
         one_count = 0
         x_batch = []
         y_batch = []
         for index, data in enumerate(x_data):
-            if y_data[index, 0] == 1:
+            if y_data[index, 0] == 0:
                 one_count += 1
-            if one_count > max_ones and y_data[index, 0] == 1:
+            if one_count > max_ones and y_data[index, 0] == 0:
                 continue
             x_batch.append(data)
             y_batch.append(y_data[index])
-            if index >= b_size:
-                break
-        batches.append((np.array(x_batch), np.array(y_batch)))
+            #if len(y_batch) >= b_size:
+            #    break
+        x_batch, y_batch = shuffle(x_batch, y_batch)
+        x_batch, y_batch = np.array(x_batch), np.array(y_batch)
+        print('Ones', np.sum(y_batch[:, 0]), 'Zeros', len(y_batch) - np.sum(y_data[:, 0]))
+        batches.append((np.array(x_batch[0:b_size]), np.array(y_batch[0:b_size])))
         bar.update(it+1)
+    return batches
 bar.finish()
 
 batches = create_batches(X_train, Y_train, batch_size)
 
-def generate_data(x_data, y_data, b_size):
+def generate_data(x_data, y_data, b_size, batches, no_epochs):
     i = 0
     while True:
-        yield batches[i % b_size][0], batches[i % b_size][1]
+        yield batches[i % no_epochs]
         i = i + 1
 
 
 def get_model():
-    data_input = Input(shape=(None, 39))
+    data_input = Input(shape=(None, 40))
 
     X = BatchNormalization()(data_input)
 
@@ -167,10 +174,11 @@ def get_model():
     X = Dense(256, activation='relu',
               kernel_regularizer=regularizers.l2(0.0005))(X)
     # X = GlobalMaxPooling1D()(X)
+    X = Dropout(0.5)(X)
     X = Dense(128, activation='relu',
               kernel_regularizer=regularizers.l2(0.0005))(X)
     # X = Bidirectional(LSTM(32))(X)
-    X = Dropout(0.5)(X)
+
     X = Dense(2, kernel_regularizer=regularizers.l2(0.0005))(X)
     X = Activation("softmax")(X)
     model = Model(input=data_input, output=X)
@@ -204,29 +212,29 @@ def focal_loss(y_true, y_pred):
 
 
 def recall_m(y_true, y_pred):
-    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
-    possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
+    true_positives = K.sum(K.round(K.clip(y_true[0] * y_pred[0], 0, 1)))
+    possible_positives = K.sum(K.round(K.clip(y_true[0], 0, 1)))
     recall = true_positives / (possible_positives + K.epsilon())
     return recall
 
 
 def precision_m(y_true, y_pred):
-    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
-    predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
+    true_positives = K.sum(K.round(K.clip(y_true[0] * y_pred[0], 0, 1)))
+    predicted_positives = K.sum(K.round(K.clip(y_pred[0], 0, 1)))
     precision = true_positives / (predicted_positives + K.epsilon())
     return precision
 
 
 def f1_m(y_true, y_pred):
-    precision = precision_m(y_true, y_pred)
-    recall = recall_m(y_true, y_pred)
+    precision = precision_m(y_true[0], y_pred)
+    recall = recall_m(y_true[0], y_pred[0])
     return 2 * ((precision * recall) / (precision + recall + K.epsilon()))
 
 
 model.compile(optimizer=Adam(lr=0.001, decay=1e-8), loss=[focal_loss],
               metrics=['accuracy', f1_m, precision_m, recall_m])
 
-generator2 = generate_data(X_train, Y_train, batch_size)
+generator2 = generate_data(X_train, Y_train, batch_size, batches, no_epochs)
 
 reduce_lr = ReduceLROnPlateau(
     monitor='loss', factor=0.1, patience=10, verbose=1, mode='min')
