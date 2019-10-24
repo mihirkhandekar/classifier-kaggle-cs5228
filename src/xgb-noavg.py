@@ -11,7 +11,7 @@ from keras.optimizers import Adam, SGD
 from keras.wrappers.scikit_learn import KerasClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.utils import shuffle
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, recall_score, precision_score
 from scipy.stats import mode
 
 ## Below path hardcoded. TODO: Change this
@@ -48,11 +48,9 @@ for fileno in range(10000):
 
     test_X.append(zeros_array)
 
-test_X = np.delete(test_X, 2, axis=2)
-test_X = np.delete(test_X, 3, axis=2)
-test_X = np.delete(test_X, 11, axis=2)
-test_X = np.delete(test_X, 33, axis=2)
-test_X = np.delete(test_X, 35, axis=2)
+deleting_index = [0,1,4,6,8,9,10,14,16,19,21,22,23,25,26,27,28,30,32,34,36,38]
+
+test_X = np.delete(test_X, deleting_index, axis=2)
 test_X = test_X.reshape((test_X.shape[0], -1))
 test_X = np.nan_to_num(test_X)
 
@@ -99,11 +97,7 @@ for it in range(iterations):
     X = np.array(X)
     y = np.array(y)
 
-    X = np.delete(X, 2, axis=2)
-    X = np.delete(X, 3, axis=2)
-    X = np.delete(X, 11, axis=2)
-    X = np.delete(X, 33, axis=2)
-    X = np.delete(X, 35, axis=2)
+    X = np.delete(X, deleting_index, axis=2)
     X = X.reshape((X.shape[0], -1))
 
 
@@ -125,7 +119,7 @@ for it in range(iterations):
     
     y_pred = model.predict(x_test)
     xg_predictions = [round(value) for value in y_pred]
-    print('Round validation accuracy', accuracy_score(xg_predictions, y_test))
+    print('Round validation accuracy, recall, precision', accuracy_score(y_test, xg_predictions), recall_score(y_test, xg_predictions), precision_score(y_test, xg_predictions))
 
     y_xg_1 = model.predict(test_X)
     test_set_results.append(y_xg_1)
@@ -146,7 +140,7 @@ final_y = [round(value) for value in final_y]
 import pandas as pd
 df = pd.DataFrame()
 df["Predicted"] = final_y
-df.to_csv('output-1.csv')
+df.to_csv('output-noavg.csv')
 '''
 # load json and create model
 json_file = open('model.json', 'r')

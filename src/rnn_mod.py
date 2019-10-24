@@ -47,7 +47,7 @@ train_samples = 30336
 test_samples = 10000
 no_epochs = 15
 max_time = 50
-deleted_cols = []
+deleted_cols = [0,1,4,6,8,9,10,14,16,19,21,22,23,25,26,27,28,30,32,34,36,38]
 
 print('Reading labels CSV')
 labels = pd.read_csv("data/train_kaggle.csv")
@@ -146,7 +146,7 @@ def generate_data(x_data, y_data, b_size, batches, no_epochs):
 
 
 def get_model():
-    data_input = Input(shape=(None, 40))
+    data_input = Input(shape=(None, X_t.shape[0]))
 
     X = BatchNormalization()(data_input)
 
@@ -184,9 +184,6 @@ def get_model():
     model = Model(input=data_input, output=X)
     return model
 
-
-model = get_model()
-print(model.summary())
 
 
 def focal_loss(y_true, y_pred):
@@ -229,6 +226,10 @@ def f1_m(y_true, y_pred):
     precision = precision_m(y_true[0], y_pred)
     recall = recall_m(y_true[0], y_pred[0])
     return 2 * ((precision * recall) / (precision + recall + K.epsilon()))
+
+
+model = get_model()
+print(model.summary())
 
 
 model.compile(optimizer=Adam(lr=0.001, decay=1e-8), loss=[focal_loss],

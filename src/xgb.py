@@ -50,6 +50,7 @@ for fileno in range(10000):
     test_X.append(feature_avg)
 deleting_index = [0,1,4,6,8,9,10,14,16,19,21,22,23,25,26,27,28,30,32,34,36,38]
 
+
 test_X = np.delete(test_X, deleting_index, axis=1)
 #est_X = np.delete(test_X, 3, axis=1)
 ##test_X = np.delete(test_X, 11, axis=1)
