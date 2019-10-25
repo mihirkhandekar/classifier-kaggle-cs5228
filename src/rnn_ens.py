@@ -92,6 +92,23 @@ def __get_model():
 
     return model
 
+def auc_roc(y_true, y_pred):
+    # any tensorflow metric
+    value, update_op = tf.contrib.metrics.streaming_auc(y_pred, y_true)
+
+    # find all variables created for this metric
+    metric_vars = [i for i in tf.local_variables() if 'auc_roc' in i.name.split('/')[1]]
+
+    # Add metric variables to GLOBAL_VARIABLES collection.
+    # They will be initialized for new session.
+    for v in metric_vars:
+        tf.add_to_collection(tf.GraphKeys.GLOBAL_VARIABLES, v)
+
+    # force to update metric values
+    with tf.control_dependencies([update_op]):
+        value = tf.identity(value)
+        return value
+
 def focal_loss(y_true, y_pred):
     gamma = 2.0
     alpha = 0.5
@@ -109,7 +126,7 @@ def generate_data(x_data_1, x_data_2, y_data, b_size):
         x_batch_2 = np.array(x_data_2[batch_size * counter:batch_size * (counter + 1)])
         y_batch = np.array(y_data[batch_size * counter:batch_size * (counter + 1)])
         counter += 1
-        yield [x_batch_1, y_batch_1], y_batch
+        yield [x_batch_1, x_batch_2], y_batch
 
         if counter >= number_of_batches:
             counter = 0
@@ -191,7 +208,7 @@ model = __get_model()
 print(model.summary())
 
 model.compile(optimizer=Adam(lr=0.001, decay=1e-8), loss=[focal_loss],
-              metrics=['accuracy', roc_auc_score, precision_score, recall_score])
+              metrics=['accuracy', auc_roc])
 
 early_stopping = EarlyStopping(
     monitor='val_accuracy', patience=6, mode='auto')
