@@ -12,7 +12,7 @@ from keras.callbacks.callbacks import (EarlyStopping, LearningRateScheduler,
 from keras.layers import (LSTM, Activation, BatchNormalization, Bidirectional,
                           Concatenate, Conv1D, Conv2D, Dense, Dropout,
                           Embedding, GlobalMaxPooling1D, Input, MaxPooling1D,
-                          Multiply)
+                          Multiply, Flatten)
 from keras.models import Model, Sequential, load_model
 from keras.optimizers import SGD, Adam
 from keras.preprocessing import sequence
@@ -26,7 +26,7 @@ from sklearn.utils import class_weight, shuffle
 from xgboost import XGBRegressor
 
 ## Below path hardcoded. TODO: Change this
-prefix_path = '..'
+prefix_path = 'data'
 
 labels = pd.read_csv(prefix_path + '/train_kaggle.csv')
 
@@ -62,7 +62,7 @@ def __get_training_x(sparse_x, dense_x, zeros_array):
     return sparse_means, zeros_array
 
 def __get_model():
-    input_sparse = Input(shape=(len(sparse_index)))
+    input_sparse = Input(shape=(len(sparse_index),))
     sparse_relu = Activation('relu')(input_sparse)
     sparse_sigmoid = Activation('sigmoid')(input_sparse)
     combine_sparse = Multiply()([sparse_relu, sparse_sigmoid])
@@ -71,6 +71,11 @@ def __get_model():
     dense_conv_sig = Conv1D(128, (1), activation='sigmoid', padding='same', kernel_regularizer=regularizers.l2(0.0005))(input_dense)
     dense_conv_relu = Conv1D(128, (1), activation='relu', padding='same', kernel_regularizer=regularizers.l2(0.0005))(input_dense)
     combine_dense = Multiply()([dense_conv_relu, dense_conv_sig])
+    
+    combine_dense = BatchNormalization()(combine_dense)
+    combine_dense = Bidirectional(LSTM(64))(combine_dense)
+
+    #combine_dense = Flatten()(combine_dense)
 
     combined = Concatenate()([combine_sparse, combine_dense])
 
@@ -110,7 +115,7 @@ def generate_data(x_data_1, x_data_2, y_data, b_size):
             counter = 0
 
 
-generator = generate_data(x_train_1, x_train_2, y_train, batch_size)
+
 
 for fileno in range(10000):
     ## zeros_array used to keep the maximum number of sequences constant to max_len
@@ -178,8 +183,8 @@ print('X2_test shape', x_test_1.shape)
 print('y_train Shape', y_train.shape)
 print('y_test shape', y_test.shape)
 
-exit(0)
 
+generator = generate_data(x_train_1, x_train_2, y_train, batch_size)
 
 ###### DL Training
 model = __get_model()
