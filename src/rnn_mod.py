@@ -90,7 +90,8 @@ X_t, y_t = shuffle(X_t, y_t)
 
 X = np.nan_to_num(X_t)
 print(y_t)
-y = np.array([y_t.T, (1-y_t).T]).T
+#y = np.array([y_t.T, (1-y_t).T]).T
+y = np.array(y_t)
 print(y.shape, y)
 
 print("After preprocessing", X.shape, y.shape)
@@ -115,22 +116,22 @@ def create_batches(x_data, y_data, b_size):
     for it in range(no_epochs):
         x_data, y_data = shuffle(x_data, y_data)
         
-        max_ones = np.sum(y_data[:, 0])
+        max_ones = np.sum(y_data)
         one_count = 0
         x_batch = []
         y_batch = []
         for index, data in enumerate(x_data):
-            if y_data[index, 0] == 0:
-                one_count += 1
-            if one_count > max_ones and y_data[index, 0] == 0:
-                continue
+            #if y_data[index] == 0:
+            #    one_count += 1
+            #if one_count > max_ones and y_data[index] == 0:
+            #    continue
             x_batch.append(data)
             y_batch.append(y_data[index])
             #if len(y_batch) >= b_size:
             #    break
         x_batch, y_batch = shuffle(x_batch, y_batch)
         x_batch, y_batch = np.array(x_batch), np.array(y_batch)
-        print('Ones', np.sum(y_batch[:, 0]), 'Zeros', len(y_batch) - np.sum(y_data[:, 0]))
+        #print('Ones', np.sum(y_batch[:]), 'Zeros', len(y_batch) - np.sum(y_data[:]))
         batches.append((np.array(x_batch[0:b_size]), np.array(y_batch[0:b_size])))
         bar.update(it+1)
     return batches
@@ -146,7 +147,7 @@ def generate_data(x_data, y_data, b_size, batches, no_epochs):
 
 
 def get_model():
-    data_input = Input(shape=(None, X_t.shape[0]))
+    data_input = Input(shape=(None, 18))
 
     X = BatchNormalization()(data_input)
 
@@ -179,15 +180,15 @@ def get_model():
               kernel_regularizer=regularizers.l2(0.0005))(X)
     # X = Bidirectional(LSTM(32))(X)
 
-    X = Dense(2, kernel_regularizer=regularizers.l2(0.0005))(X)
-    X = Activation("softmax")(X)
+    X = Dense(1, kernel_regularizer=regularizers.l2(0.0005))(X)
+    X = Activation("sigmoid")(X)
     model = Model(input=data_input, output=X)
     return model
 
 
 
 def focal_loss(y_true, y_pred):
-    gamma = 2
+    '''gamma = 2
     alpha = 0.5
     y_pred = tf.maximum(y_pred, 1e-15)
     log_y_pred = tf.log(y_pred)
@@ -203,28 +204,28 @@ def focal_loss(y_true, y_pred):
     pt_0 = tf.where(tf.equal(y_true, 0), y_pred, tf.zeros_like(y_pred))
     return -K.sum(alpha * K.pow(1. - pt_1, gamma) * K.log(pt_1)) - K.sum(
         (1 - alpha) * K.pow(pt_0, gamma) * K.log(1. - pt_0))
-'''
+
 
 # model = load_model("cp1")
 
 
 def recall_m(y_true, y_pred):
-    true_positives = K.sum(K.round(K.clip(y_true[0] * y_pred[0], 0, 1)))
-    possible_positives = K.sum(K.round(K.clip(y_true[0], 0, 1)))
+    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+    possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
     recall = true_positives / (possible_positives + K.epsilon())
     return recall
 
 
 def precision_m(y_true, y_pred):
-    true_positives = K.sum(K.round(K.clip(y_true[0] * y_pred[0], 0, 1)))
-    predicted_positives = K.sum(K.round(K.clip(y_pred[0], 0, 1)))
+    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+    predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
     precision = true_positives / (predicted_positives + K.epsilon())
     return precision
 
 
 def f1_m(y_true, y_pred):
-    precision = precision_m(y_true[0], y_pred)
-    recall = recall_m(y_true[0], y_pred[0])
+    precision = precision_m(y_true, y_pred)
+    recall = recall_m(y_true, y_pred)
     return 2 * ((precision * recall) / (precision + recall + K.epsilon()))
 
 
@@ -247,12 +248,13 @@ early_stopping = EarlyStopping(
 
 #class_weights = class_weight.compute_class_weight('balanced', np.unique(Y_train), Y_train)
 
+class_weights = {0: 0.1, 1: 0.9}
 model.fit_generator(
     generator2,
     steps_per_epoch=math.ceil(len(X_train) / batch_size),
     epochs=no_epochs,
     shuffle=True,
-    # class_weight=class_weights,
+    class_weight=class_weights,
     verbose=1,
     # initial_epoch=86,
     validation_data=(X_val, Y_val),
@@ -288,10 +290,10 @@ print("Predicting test data")
 pred = model.predict(X_test)
 print(pred.shape, pred)
 p = pd.DataFrame()
-p['Predicted'] = pred.T[0]
+p['Predicted'] = pred.reshape((10000,))
 p.to_csv('rnn_v11.csv', index=True)
 
-pred2 = pd.DataFrame()
-pred2['1'] = pred.T[0]
-pred2['2'] = pred.T[1]
-pred2.to_csv('rnn_v12_pred.csv', index=True)
+#pred2 = pd.DataFrame()
+#pred2['1'] = pred.T[0]
+#pred2['2'] = pred.T[1]
+#pred2.to_csv('rnn_v12_pred.csv', index=True)
