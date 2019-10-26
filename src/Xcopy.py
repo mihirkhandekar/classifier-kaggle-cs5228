@@ -21,16 +21,19 @@ labels = pd.read_csv(prefix_path + '/train_kaggle.csv')
 
 print('Labels', labels.describe())
 
-iterations = 1
+iterations = 6
 
 test_X = []
 
-sparse_index = [0, 1, 4, 6, 8, 9, 10, 14, 16, 19, 21, 22, 23, 25, 26, 27, 28, 30, 31, 32, 33, 34, 36, 38]
+#sparse_index = [0, 1, 4, 6, 8, 9, 10, 14, 16, 19, 21, 22, 23, 25, 26, 27, 28, 30, 31, 32, 33, 34, 36, 38]
 sparse_index = [i for i in range(40)]
 dense_index = [2, 3, 5, 7, 11, 12, 13, 15, 17, 18, 20, 24, 29, 33, 35, 37, 39]
 
 def __preprocess_feature(feat):
     sparse_x = feat[:, sparse_index]
+    #fl = [0, np.array(sparse_x).shape[0] - 1]
+    #sparse_x = sparse_x[fl, :].reshape((np.array(sparse_x).shape[1] * 2, 1))
+    #spx = sparse_x[0, :].extend(sparse_x[np.array(sparse_x).shape[0] - 1, :])
     dense_x = feat[:, dense_index]
     return sparse_x, dense_x
 
@@ -111,8 +114,10 @@ for it in range(iterations):
     ## Split into train and test datasets
     x_train, x_test, y_train, y_test = train_test_split(X_sparse, y, test_size=0.20)
 
-    x_test_2 = np.concatenate([x_test, zero_test])
-    y_test_2 = np.concatenate([y_test, zero_test_y])
+    #x_test_2 = np.concatenate([x_test, zero_test])
+    #y_test_2 = np.concatenate([y_test, zero_test_y])
+    x_test_2 = np.concatenate([x_test])
+    y_test_2 = np.concatenate([y_test])
 
     #weight_ratio = float(len(y_train[y_train == 0]))/float(len(y_train[y_train == 
 #1]))
@@ -136,14 +141,15 @@ for it in range(iterations):
     lgb_eval = gbm.Dataset(x_test, y_test, reference=lgb_train)
     params = {
         'boosting_type': 'gbdt',
-        'objective': 'regression',
+        'objective': 'binary',
         'metric': {'l2', 'l1'},
         'num_leaves': 128,
         'learning_rate': 0.05,
         'feature_fraction': 0.9,
         'bagging_fraction': 0.8,
         'bagging_freq': 10,
-        'verbose': 0
+        'verbose': 0,
+        "tree_learner": "feature"
     }
     model = gbm.train(params,
                 lgb_train,
@@ -163,7 +169,7 @@ print('Results', test_set_results.shape)
 
 ##accuracy = accuracy_score(final_score, xg_predictions)
 #print("Accuracy: %.2f%%" % (accuracy * 100.0))
-
+print(test_set_results)
 final_y = np.average(test_set_results, axis=0)
 print(final_y.shape, final_y)
 
