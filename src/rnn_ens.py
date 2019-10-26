@@ -35,8 +35,9 @@ print('Labels', labels.describe())
 
 test_data_x_1 = []
 test_data_x_2 = []
+
 max_len = 50
-num_epochs = 20
+num_epochs = 50
 
 sparse_index = [0, 1, 4, 6, 8, 9, 10, 14, 16, 19, 21, 22, 23, 25, 26, 27, 28, 30, 31, 32, 33, 34, 36, 38]
 dense_index = [2, 3, 5, 7, 11, 12, 13, 15, 17, 18, 20, 24, 29, 33, 35, 37, 39]
@@ -68,25 +69,24 @@ def __get_model():
     combine_sparse = Multiply()([sparse_relu, sparse_sigmoid])
 
     input_dense = Input(shape=(None, len(dense_index)))
-    dense_conv_sig = Conv1D(128, (1), activation='sigmoid', padding='same', kernel_regularizer=regularizers.l2(0.0005))(input_dense)
-    dense_conv_relu = Conv1D(128, (1), activation='relu', padding='same', kernel_regularizer=regularizers.l2(0.0005))(input_dense)
+    dense_conv_sig = Conv1D(32, (1), activation='sigmoid', padding='same', kernel_regularizer=regularizers.l2(0.0005))(input_dense)
+    dense_conv_relu = Conv1D(32, (1), activation='relu', padding='same', kernel_regularizer=regularizers.l2(0.0005))(input_dense)
     combine_dense = Multiply()([dense_conv_relu, dense_conv_sig])
-    
+    combine_dense = Dropout(0.5)(combine_dense)
     combine_dense = BatchNormalization()(combine_dense)
-    combine_dense = Bidirectional(LSTM(64))(combine_dense)
+    combine_dense = Bidirectional(LSTM(32))(combine_dense)
 
     #combine_dense = Flatten()(combine_dense)
 
     combined = Concatenate()([combine_sparse, combine_dense])
 
-    dense_1 = Dense(256, activation='relu',
+    dense_1 = Dense(128, activation='relu',
               kernel_regularizer=regularizers.l2(0.0005))(combined)
 
-    dense_2 = Dense(128, activation='relu',
+    dense_2 = Dense(64, activation='relu',
               kernel_regularizer=regularizers.l2(0.0005))(dense_1)
 
-    output = Dense(1, activation='sigmoid',
-              kernel_regularizer=regularizers.l2(0.0005))(dense_2)
+    output = Dense(1, activation='sigmoid')(dense_2)
 
     model = Model(input=[input_sparse, input_dense], output=output)
 
@@ -181,8 +181,8 @@ for index, train_label in shuffled_labels.iterrows():
 
     y.append(label)
 
-X_1 = np.array(X_1)
-X_2 = np.array(X_2)
+X_1 = np.nan_to_num(np.array(X_1))
+X_2 = np.nan_to_num(np.array(X_2))
 y = np.array(y)
 
 
@@ -207,12 +207,13 @@ generator = generate_data(x_train_1, x_train_2, y_train, batch_size)
 model = __get_model()
 print(model.summary())
 
-model.compile(optimizer=Adam(lr=0.001, decay=1e-8), loss=[focal_loss],
-              metrics=['accuracy', auc_roc])
+model.compile(optimizer=Adam(lr=0.001, decay=1e-8), loss=['binary_crossentropy'],
+              metrics=['accuracy'])
 
 early_stopping = EarlyStopping(
     monitor='val_accuracy', patience=6, mode='auto')
 
+'''
 model.fit_generator(
     generator,
     steps_per_epoch=math.ceil(len(x_train_1) / batch_size),
@@ -223,15 +224,18 @@ model.fit_generator(
     # initial_epoch=86,
     validation_data=([x_test_1, x_test_2], y_test),
     callbacks=([early_stopping]))
+'''
+
+print('Training data shapes', x_train_1, x_train_2, y_train)
+model.fit([x_train_1, x_train_2], y_train, validation_data=([x_test_1, x_test_2], y_test), epochs=num_epochs, callbacks=([early_stopping]))
 
 
-
-y_pred = model.predict([x_test_1, x_test_2])
+y_pred = model.predict([test_data_x_1, test_data_x_2])
 
 print(y_pred)
 
 df = pd.DataFrame()
-df["Predicted"] = y_pred
+df["Predicted"] = y_pred.reshape((10000,))
 df.to_csv('output-1.csv', index_label="Id")
 '''
 # load json and create model
