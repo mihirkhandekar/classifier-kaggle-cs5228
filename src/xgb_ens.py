@@ -80,17 +80,6 @@ for it in range(iterations):
         features = np.load(prefix_path + '/train/train/' + str(train_label['Id']) + '.npy')
 
         sparse_x, dense_x = __preprocess_feature(features)
-        ## For each feature, we find average of all values and replace all NaN with that value
-        #for feature in range(40):
-        #    average_value = np.average(features[:feature][np.nan_to_num(features[:feature]) != 0])
-        #    features[:feature] = np.nan_to_num(features[:feature], average_value)
-        
-        #feature_avg = np.average(features, axis=0)
-        #assert feature_avg.shape == (features.shape[1],)
-        ##if len(X) == 0:
-        #    X = np.array([feature_avg])
-        #else:
-        #    X = np.concatenate((X, [feature_avg]))
 
         sparse_means = np.nanmean(np.where(sparse_x!=0, sparse_x, np.nan), axis=0)
         X_sparse.append(sparse_means)
