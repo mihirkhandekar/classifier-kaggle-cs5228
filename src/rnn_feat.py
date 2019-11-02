@@ -39,7 +39,22 @@ def __preprocess_feature(feat):
 
 
 def __get_model():
-    data_input = Input(shape=(160,))
+    left = Sequential()
+    left.add(BatchNormalization())
+    left.add(Activation('relu'))
+    right = Sequential()
+    right.add(BatchNormalization())
+    right.add(Activation('sigmoid'))
+    model = Multiply([left, right])
+    model.add(Dense(256, activation='relu', input_shape=(160, )))
+    model.add(Dropout(0.25))
+    model.add(Dense(128, activation='relu'))
+    model.add(Dense(64, activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(1, activation='sigmoid'))
+    return model
+    '''
+    data_input = Input(shape=(160))
 
     X = BatchNormalization()(data_input)
 
@@ -62,7 +77,7 @@ def __get_model():
     X = Activation("sigmoid")(X)
     model = Model(input=data_input, output=X)
     return model
-    
+    '''
 
 def __extract_features(features):
     sparse_x = __preprocess_feature(np.array(features))
