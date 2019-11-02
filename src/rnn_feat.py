@@ -27,7 +27,7 @@ from sklearn.utils import class_weight, shuffle
 
 sparse_index = [i for i in range(40)]
 
-prefix_path = '..'
+prefix_path = '../data'
 labels = pd.read_csv(prefix_path + '/train_kaggle.csv')
 print('Labels', labels.describe())
 iterations = 6
@@ -39,7 +39,16 @@ def __preprocess_feature(feat):
 
 
 def __get_model():
-    data_input = Input(shape=(None, 18))
+    model = Sequential()
+    model.add(Dense(256, activation='relu', input_shape=(160, )))
+    model.add(Dropout(0.25))
+    model.add(Dense(128, activation='relu'))
+    model.add(Dense(64, activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(1, activation='sigmoid'))
+    return model
+    '''
+    data_input = Input(shape=(160))
 
     X = BatchNormalization()(data_input)
 
@@ -62,7 +71,7 @@ def __get_model():
     X = Activation("sigmoid")(X)
     model = Model(input=data_input, output=X)
     return model
-
+    '''
 
 def __extract_features(features):
     sparse_x = __preprocess_feature(np.array(features))
@@ -77,7 +86,7 @@ def __extract_features(features):
 
     sp_features = np.concatenate(
         [sparse_max, sparse_medians, sparse_x[0], sparse_x[-1]])
-    return sp_features
+    return np.nan_to_num(sp_features)
 
 
 test_X = []
@@ -93,7 +102,7 @@ for fileno in range(10000):
 batch_size = 256
 train_samples = 30336
 test_samples = 10000
-no_epochs = 15
+no_epochs = 100
 max_time = 50
 
 
@@ -130,7 +139,7 @@ for it in range(iterations):
 
     lstm_model = __get_model()
     lstm_model.compile(optimizer=Adam(lr=0.001, decay=1e-8), loss='binary_crossentropy',
-                       metrics=['val_accuracy'])
+                       metrics=['accuracy'])
 
     reduce_lr = ReduceLROnPlateau(
         monitor='loss', factor=0.1, patience=10, verbose=1, mode='min')
@@ -138,7 +147,7 @@ for it in range(iterations):
     model_checkpoint = ModelCheckpoint(
         "cp1", monitor='loss', save_best_only=True, mode='min')
     early_stopping = EarlyStopping(
-        monitor='val_accuracy', patience=6, mode='auto')
+        monitor='val_accuracy', patience=32, mode='auto')
 
     lstm_model.fit(
         x_train, y_train,
@@ -146,11 +155,12 @@ for it in range(iterations):
         shuffle=True,
         verbose=1,
         validation_data=(x_val, y_val),
-        callbacks=([model_checkpoint, terminate_on_nan, reduce_lr, early_stopping]))
+        callbacks=([model_checkpoint, terminate_on_nan, early_stopping]))
 
     y_pred = lstm_model.predict(x_val)
+    print(y_pred.shape)
 
-    xg_predictions = [int(round(value)) for value in y_pred]
+    xg_predictions = [int(round(value[0])) for value in y_pred]
     print('Round validation ROC-AUC = {}, accuracy = {}, recall = {}, precision = {}'.format(roc_auc_score(y_val, y_pred),
                                                                                              accuracy_score(y_val, xg_predictions), recall_score(
         y_val, xg_predictions),
