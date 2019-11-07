@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import progressbar
 import tensorflow as tf
+import random
 from keras import regularizers
 from keras.callbacks.callbacks import (EarlyStopping, LearningRateScheduler,
                                        ModelCheckpoint, ReduceLROnPlateau,
@@ -31,6 +32,7 @@ from sklearn.metrics import (accuracy_score, precision_score, recall_score,
 from sklearn.model_selection import train_test_split
 from sklearn.utils import class_weight, shuffle
 from xgboost import XGBRegressor, XGBClassifier
+from catboost import CatBoostClassifier
 
 sparse_index = [i for i in range(40)]
 sparse_index = [i for i in sparse_index if i not in [4, 10, 25]]
@@ -40,11 +42,29 @@ labels = pd.read_csv(prefix_path + '/train_kaggle.csv')
 print('Labels', labels.describe())
 iterations = 6
 
+'''params = {'num_leaves': 491,
+          'min_child_weight': 0.03454472573214212,
+          'feature_fraction': 0.3797454081646243,
+          'bagging_fraction': 0.4181193142567742,
+          'min_data_in_leaf': 106,
+          'objective': 'binary',
+          'max_depth': -1,
+          'learning_rate': 0.006883242363721497,
+          "boosting_type": "gbdt",
+          "bagging_seed": 11,
+          "metric": 'auc',
+          "verbosity": -1,
+          'reg_alpha': 0.3899927210061127,
+          'reg_lambda': 0.6485237330340494,
+          'random_state': 47
+         }'''
+
 params = {
     'boosting_type': 'gbdt',
     'objective': 'binary',
     'metric': {'l2', 'l1'},
-    'num_leaves': 128,
+    'num_leaves': 256,
+    'min_data_in_leaf': 106,
     'learning_rate': 0.02,
     'feature_fraction': 0.8,
     'bagging_fraction': 0.9,
@@ -73,7 +93,7 @@ def __get_model(lgb_train, lgb_eval, x_train, y_train):
     return clf'''
 
 
-def __extract_features(features):
+def __extract_features(features, rand_indices):
     sparse_x = __preprocess_feature(np.array(features))
 
     # For each feature, we find average of all values and replace all NaN with that value
@@ -90,19 +110,11 @@ def __extract_features(features):
 
     # sp_features = np.concatenate([sparse_modes, sparse_vars, sparse_max, sparse_x[0], sparse_x[-1]])
     sp_features = np.concatenate([sparse_modes, sparse_vars, [sparse_x.shape[0]], sparse_x[0], sparse_x[-1]])
-    return np.nan_to_num(sp_features, -1)
+    return np.nan_to_num(sp_features, 0)
 
 
-test_X = []
 test_Y = []
 
-# Read test file
-for fileno in range(10000):
-    features = np.load(prefix_path + '/test/test/' + str(fileno) + '.npy')
-    sp_features = __extract_features(features)
-    test_X.append(sp_features)
-
-test_X = np.array(test_X)
 
 batch_size = 256
 train_samples = 30336
@@ -111,7 +123,23 @@ no_epochs = 100
 max_time = 50
 
 
+
 for it in range(iterations):
+    rand_indices = random.sample(range(1, 37), 25)
+    test_X = []
+    # Read test file
+    test_X_features = []
+    for fileno in range(10000):
+        test_features = np.load(prefix_path + '/test/test/' + str(fileno) + '.npy')
+        
+        sp_features = __extract_features(test_features, rand_indices)
+        
+        test_X.append(sp_features)
+        test_X_features.extend(test_features[:, 0])
+
+    test_X = np.array(test_X)
+    print('TEX shape', np.array(test_X_features).shape, np.unique(np.array(test_X_features)))
+    
     print('Starting Iteration ', it)
     X = []
     y = []
@@ -129,7 +157,7 @@ for it in range(iterations):
         features = np.load(prefix_path + '/train/train/' +
                            str(train_label['Id']) + '.npy')
 
-        sp_features = __extract_features(features)
+        sp_features = __extract_features(features, rand_indices)
         X.append(sp_features)
         y.append(label)
 
@@ -150,19 +178,19 @@ for it in range(iterations):
     X = np.array(X)
     y = np.array(y)
 
-    from sklearn.feature_selection import VarianceThreshold
-    sel = VarianceThreshold(threshold=0.15)
-    sel.fit_transform(X)
+    #from sklearn.feature_selection import VarianceThreshold
+    #sel = VarianceThreshold(threshold=0.15)
+    #sel.fit_transform(X)
     #print('Variances', sel.variances_, len(sel.variances_))
-    top_features = np.argsort(sel.variances_)[::-1][0:155]
+    #top_features = np.argsort(sel.variances_)[::-1][0:155]
     #fs = SelectPercentile(f_classif, percentile=70)
     #fs.fit_transform(X, y)
     #top_features = np.argsort(fs.scores_)[::-1][0:150]
     #print('Top features in round : ', top_features)
 
-    X = X[:, top_features]
+    #X = X[:, top_features]
 
-    round_test_X = test_X[:, top_features]
+    round_test_X = test_X#[:, top_features]
 
     x_train, x_val, y_train, y_val = train_test_split(X, y, test_size=0.20)
 
@@ -181,10 +209,25 @@ for it in range(iterations):
     # dt_model.fit(x_train, y_train)
 
     xgb_model = XGBClassifier(learning_rate=0.1, scale_pos_weight = 9, max_depth=7, min_child_weight=1, subsample=0.6, n_estimators=800, gamma=0.8, colsample_bytree=0.8)
-    xgb_model.fit(x_train, y_train, early_stopping_rounds=10, eval_metric="logloss", eval_set=[(x_val, y_val)], verbose=True)
+    '''xgb_model = XGBClassifier(alpha=4, base_score=0.5, booster='gbtree', colsample_bylevel=1,
+              colsample_bynode=1, colsample_bytree=0.9, gamma=0.1,
+              learning_rate=0.05, max_delta_step=0, max_depth=9,
+              min_child_weight=1, missing=-1, n_estimators=500, n_jobs=1,
+              nthread=None, objective='binary:logistic', random_state=0,
+              reg_alpha=0, reg_lambda=1, scale_pos_weight=1, seed=None,
+              silent=None, subsample=0.9, tree_method='hist', verbosity=1)
+    '''
+    #xgb_model.fit(x_train, y_train, early_stopping_rounds=10, eval_metric="logloss", eval_set=[(x_val, y_val)], verbose=True)
 
+    cat_model = CatBoostClassifier()
+    #cat_model.fit(x_train, y_train)
 
-    y_pred = (gbm_model.predict(x_val) + xgb_model.predict(x_val)) / 2
+    #from sklearn.ensemble import BaggingClassifier
+
+    #bag_model = BaggingClassifier()
+    #bag_model.fit(x_train, y_train)
+
+    y_pred = gbm_model.predict(x_val)
     print(y_pred.shape)
 
     xg_predictions = [int(round(value)) for value in y_pred]
@@ -193,7 +236,7 @@ for it in range(iterations):
         y_val, xg_predictions),
         precision_score(y_val, xg_predictions)))
 
-    y_test_dl = (gbm_model.predict(round_test_X) + xgb_model.predict(round_test_X)) / 2
+    y_test_dl = gbm_model.predict(round_test_X)
     test_Y.append(y_test_dl)
 
 test_Y = np.array(test_Y)
