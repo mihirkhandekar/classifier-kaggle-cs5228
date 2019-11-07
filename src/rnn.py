@@ -120,7 +120,6 @@ X_train, X_val, Y_train, Y_val = train_test_split(X, y, shuffle=True, test_size=
 # print("Trainig set", X_train, X_val)
 print("Trainig set shapes", X_train.shape, Y_train, X_val.shape, Y_val.shape)
 
-
 def generate_data(x_data, y_data, b_size):
     samples_per_epoch = x_data.shape[0]
     number_of_batches = samples_per_epoch / b_size
