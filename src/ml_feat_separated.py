@@ -47,13 +47,13 @@ iterations = 6
 params = {
     'boosting_type': 'gbdt',
     'objective': 'binary',
-    'metric': {'l1', 'l2'},
-    'num_leaves': 256,
+    'metric': {'l2', 'binary_logloss'},
+    'num_leaves': 196,
     'learning_rate': 0.02,
-    'feature_fraction': 0.8,
+    'feature_fraction': 0.9,
     'bagging_fraction': 0.9,
     'num_threads': 4,
-    'bagging_freq': 10,
+    'bagging_freq': 5,
     'verbose': 0,
     "tree_learner": "feature"
 }
@@ -61,13 +61,13 @@ params = {
 ar_params = {
     'boosting_type': 'gbdt',
     'objective': 'binary',
-    'metric': {'l1', 'l2'},
-    'num_leaves': 256,
+    'metric': {'l1', 'l2', 'binary_logloss'},
+    'num_leaves': 196,
     'learning_rate': 0.02,
-    'feature_fraction': 0.8,
+    'feature_fraction': 0.9,
     'bagging_fraction': 0.9,
     'num_threads': 4,
-    'bagging_freq': 10,
+    'bagging_freq': 5,
     'verbose': 0,
     "tree_learner": "feature"
 }
@@ -82,7 +82,7 @@ def __preprocess_feature(feat):
 def __get_model(lgb_train, lgb_eval, x_train, y_train, param):
     model = gbm.train(param, 
                       lgb_train,
-                      num_boost_round=500,
+                      num_boost_round=800,
                       valid_sets=lgb_eval,
                       early_stopping_rounds=60)
     return model
@@ -104,7 +104,7 @@ def __extract_features(features):
 
 
     # sp_features = np.concatenate([sparse_modes, sparse_vars, sparse_max, sparse_x[0], sparse_x[-1]])
-    sp_features = np.concatenate([sparse_modes, sparse_vars, sparse_max, sparse_x[0], sparse_x[-1]])
+    sp_features = np.concatenate([sparse_modes, sparse_vars, sparse_max, sparse_medians, sparse_x[0], sparse_x[-1]])
     return np.nan_to_num(sp_features)
 
 
@@ -135,7 +135,7 @@ for it in range(iterations):
     for index, train_label in shuffled_labels.iterrows():
         label = train_label['label']
         if label == 0 and ones > 0:
-            ones = ones - 0.85
+            ones = ones - 0.65
         if ones <= 0 and label == 0:
             continue
         features = np.load(prefix_path + '/train/train/' +
@@ -154,26 +154,31 @@ for it in range(iterations):
 
     from sklearn.feature_selection import VarianceThreshold
 
-    useless = [5, 10, 41, 42, 43, 44, 46, 51, 67, 113, 115, 118, 124, 137, 144, 147, 149, 154, 160, 173]
-    keep_feat = [i for i in range(np.array(X0).shape[1])]
-    keep_feat = [i for i in keep_feat if i not in useless]
-    #sel = VarianceThreshold(threshold=0.15)
-    #sel.fit_transform(X0)
-    #print('Variances0', [(num, item) for (num, item) in enumerate(sel.variances_)])
+    #useless = [5, 10, 41, 42, 43, 44, 46, 51, 67, 113, 115, 118, 124, 137, 144, 147, 149, 154, 160, 173]
+    #keep_feat = [i for i in range(np.array(X0).shape[1])]
+    #keep_feat = [i for i in keep_feat if i not in useless]
+    
+    sel0 = VarianceThreshold(threshold=0.15)
+    sel0.fit_transform(X0)
+    print('Variances0', [(num, item) for (num, item) in enumerate(sel0.variances_)])
+    sel1 = VarianceThreshold(threshold=0.15)
+    sel1.fit_transform(X1)
+    print('Variances1', [(num, item) for (num, item) in enumerate(sel0.variances_)])
+    seln = VarianceThreshold(threshold=0.15)
+    seln.fit_transform(Xn)
+    print('Variancesn', [(num, item) for (num, item) in enumerate(sel0.variances_)])
+
+    keep_feat = [index for index, variances in enumerate(zip(sel0.variances_, sel1.variances_, seln.variances_)) if variances[0] > 0.8 and variances[1] > 0.8 and variances[2] > 0.8]
+
+    print('Useful features', keep_feat)
 
     X0 = np.array(X0)[:, keep_feat]
     y0 = np.array(y0)
     
-    #sel = VarianceThreshold(threshold=0.15)
-    #sel.fit_transform(X1)
-    #print('Variances1', [(num, item) for (num, item) in enumerate(sel.variances_)])
 
     X1 = np.array(X1)[:, keep_feat]
     y1 = np.array(y1)
     
-    #sel = VarianceThreshold(threshold=0.15)
-    #sel.fit_transform(Xn)
-    #print('Variancesn', [(num, item) for (num, item) in enumerate(sel.variances_)])
     
     Xn = np.array(Xn)[:, keep_feat]
     yn = np.array(yn)
@@ -188,6 +193,7 @@ for it in range(iterations):
     gbm_model_1 = __get_model(lgb_train_1, gbm.Dataset(x_val_1, y_val_1, reference=lgb_train_1), x_train_1, y_train_1, ar_params)
     lgb_train_n = gbm.Dataset(x_train_n, y_train_n)
     gbm_model_n = __get_model(lgb_train_n, gbm.Dataset(x_val_n, y_val_n, reference=lgb_train_n), x_train_n, y_train_n, params)
+    
     '''
     xgb_model_0 = XGBClassifier(alpha=4, base_score=0.5, booster='gbtree', colsample_bylevel=1,
               colsample_bynode=1, colsample_bytree=0.9, gamma=0.1,
@@ -218,19 +224,19 @@ for it in range(iterations):
     xgb_model_1.fit(x_train_1, y_train_1, early_stopping_rounds=50, eval_metric="logloss", eval_set=[(x_val_1, y_val_1)], verbose=True)
     
     xgb_model_n.fit(x_train_n, y_train_n, early_stopping_rounds=10, eval_metric="logloss", eval_set=[(x_val_n, y_val_n)], verbose=True)
-    
-
-    
-    cat_0 = CatBoostClassifier()
-    cat_0.fit(x_train_0, y_train_0)
     '''
+
+    '''
+    cat_0 = CatBoostClassifier(iterations=5)
+    cat_0.fit(x_train_0, y_train_0)
+    
     cat_1 = CatBoostClassifier(iterations=5, class_weights=[0.9, 1.2])
     cat_1.fit(x_train_1, y_train_1)
-    '''
-    cat_n = CatBoostClassifier()
+    
+    cat_n = CatBoostClassifier(iterations=5)
     cat_n.fit(x_train_n, y_train_n)
-    cat_model = CatBoostClassifier()
-    cat_model.fit(x_train, y_train)
+    '''
+
     '''
 
     bag_model_1 = BaggingClassifier(n_estimators=64, )
@@ -242,12 +248,13 @@ for it in range(iterations):
             return 1.2
     #sample_weight = [get_wt(sample) for sample in y_train_1]
     #bag_model_1.fit(x_train_1, y_train_1, sample_weight=sample_weight)
+    '''
 
-    y_pred_0 = gbm_model_0.predict(x_val_0)
+    y_pred_0 = gbm_model_0.predict(x_val_0) 
     xg_predictions_0 = [int(round(value)) for value in y_pred_0]
 
-    #y_pred_1 = (cat_1.predict(x_val_1) + gbm_model_1.predict(x_val_1))/2
     y_pred_1 = gbm_model_1.predict(x_val_1)
+    #y_pred_1 = gbm_model_1.predict(x_val_1)
     xg_predictions_1 = [int(round(value)) for value in y_pred_1]
 
     y_pred_n = gbm_model_n.predict(x_val_n)
@@ -267,15 +274,17 @@ for it in range(iterations):
         sp_features = __extract_features(test_features)
         tX = np.array([sp_features])[:, keep_feat]
         if test_features[0][0] == 0:
-            y_test_dl.extend(gbm_model_0.predict(tX))
+            prediction = gbm_model_0.predict(tX)
+            y_test_dl.extend(prediction)
             count_0 += 1
         elif test_features[0][0] == 1:
-            #prediction = (cat_1.predict(tX) + gbm_model_1.predict(tX))/2
             prediction = gbm_model_1.predict(tX)
+            # prediction = gbm_model_1.predict(tX)
             y_test_dl.extend(prediction)
             count_1 += 1
         else:
-            y_test_dl.extend(gbm_model_n.predict(tX))
+            prediction = gbm_model_n.predict(tX)
+            y_test_dl.extend(prediction)
             count_n += 1
 
     test_Y.append(y_test_dl)
