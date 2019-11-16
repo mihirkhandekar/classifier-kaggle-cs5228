@@ -13,8 +13,10 @@ This is a solution to the CS5228 Knowledge Discovery and Data Mining Project com
 |   |- ml_feat.py   : Code for LightGBM based approach
 |   |- nn.py        : Code for Neural Network based training
 |   |- ensemble.py  : Code to combine outputs of both
+|   |- analyze.ipynb: Basic data analysis
 |- requirements.txt : Python requirements file
 |- README.md        : This file
+
 
 
 # Installation and Deployment Instructions
