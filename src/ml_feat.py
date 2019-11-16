@@ -37,7 +37,7 @@ from catboost import CatBoostClassifier
 sparse_index = [i for i in range(40)]
 sparse_index = [i for i in sparse_index if i not in [4, 10, 25]]
 
-prefix_path = '..'
+prefix_path = '../data'
 labels = pd.read_csv(prefix_path + '/train_kaggle.csv')
 print('Labels', labels.describe())
 iterations = 6
@@ -161,34 +161,10 @@ for it in range(iterations):
         X.append(sp_features)
         y.append(label)
 
-    #print(np.nan_to_num(X), y)
-    # X_best = f_classif(np.nan_to_num(X), y) #.fit_transform(X, y)
 
-    #print(X_best, np.array(X_best).shape)
-    #mask = X_best.get_support()
-    # print(mask)
-    # for bool, feature in zip(mask, X):
-    #    if bool:
-    #        new_X.append(feature)
-
-    '''if incorrect_x is not None:
-        X_sparse.extend(incorrect_x)
-        y.extend(incorrect_y)
-    '''
     X = np.array(X)
     y = np.array(y)
 
-    #from sklearn.feature_selection import VarianceThreshold
-    #sel = VarianceThreshold(threshold=0.15)
-    #sel.fit_transform(X)
-    #print('Variances', sel.variances_, len(sel.variances_))
-    #top_features = np.argsort(sel.variances_)[::-1][0:155]
-    #fs = SelectPercentile(f_classif, percentile=70)
-    #fs.fit_transform(X, y)
-    #top_features = np.argsort(fs.scores_)[::-1][0:150]
-    #print('Top features in round : ', top_features)
-
-    #X = X[:, top_features]
 
     round_test_X = test_X#[:, top_features]
 
@@ -198,15 +174,7 @@ for it in range(iterations):
     lgb_eval = gbm.Dataset(x_val, y_val, reference=lgb_train)
 
     gbm_model = __get_model(lgb_train, lgb_eval, x_train, y_train)
-    #xgb_model = XGBRegressor(objective="binary:logistic", subsample=0.5,
-    #                         learning_rate=0.005, max_depth=8,
-    #                         min_child_weight=1.8, n_estimators=4000,
-    #                         reg_alpha=0.1, reg_lambda=0.3, gamma=0.01,
-    #                         silent=1, random_state=7, nthread=-1)
-    # xgb_model.fit(x_train, y_train)
-    # from sklearn import tree
-    # dt_model = tree.DecisionTreeRegressor()
-    # dt_model.fit(x_train, y_train)
+
 
     xgb_model = XGBClassifier(learning_rate=0.1, scale_pos_weight = 9, max_depth=7, min_child_weight=1, subsample=0.6, n_estimators=800, gamma=0.8, colsample_bytree=0.8)
     '''xgb_model = XGBClassifier(alpha=4, base_score=0.5, booster='gbtree', colsample_bylevel=1,
@@ -248,4 +216,4 @@ print(test_Y.shape, test_Y)
 
 df = pd.DataFrame()
 df["Predicted"] = test_Y
-df.to_csv('outputs/ml-output-' + str(time.time()) + '.csv', index_label="Id")
+df.to_csv('outputs/ml-output.csv', index_label="Id")

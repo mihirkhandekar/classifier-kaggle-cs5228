@@ -38,7 +38,7 @@ from sklearn.ensemble import BaggingClassifier
 sparse_index = [i for i in range(40)]
 sparse_index = [i for i in sparse_index if i not in [0, 4, 10, 25]]
 
-prefix_path = '..'
+prefix_path = '../data'
 labels = pd.read_csv(prefix_path + '/train_kaggle.csv')
 print('Labels', labels.describe())
 iterations = 6
@@ -154,10 +154,6 @@ for it in range(iterations):
 
     from sklearn.feature_selection import VarianceThreshold
 
-    #useless = [5, 10, 41, 42, 43, 44, 46, 51, 67, 113, 115, 118, 124, 137, 144, 147, 149, 154, 160, 173]
-    #keep_feat = [i for i in range(np.array(X0).shape[1])]
-    #keep_feat = [i for i in keep_feat if i not in useless]
-    
     sel0 = VarianceThreshold(threshold=0.15)
     sel0.fit_transform(X0)
     print('Variances0', [(num, item) for (num, item) in enumerate(sel0.variances_)])
