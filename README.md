@@ -16,9 +16,9 @@ This is a solution to the CS5228 Knowledge Discovery and Data Mining Project com
 |   |- analyze.ipynb: Basic data analysis
 |- requirements.txt : Python requirements file
 |- README.md        : This file
-
+|- outputs          : Folder containing generated CSV files
 
 
 # Installation and Deployment Instructions
 - Run run.sh script on your machine.
-- The final labels file will be generated as output.csv
+- The final labels file will be generated as output.csv in the outputs directory
