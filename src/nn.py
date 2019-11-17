@@ -42,7 +42,7 @@ def generate_data(x_data, y_data, b_size):
 predictions = []
 batch_size = 128
 no_epochs = 100
-ml = 120
+ml = 80
 
 def mymodel():
     X_input = Input(shape=(ml, 40))
@@ -99,7 +99,7 @@ for fileno in range(10000):
     zero_mat = np.zeros((ml, 40))
     features = np.load(prefix + '/test/test/' + str(fileno) + '.npy')
     if features.shape[0] > ml:
-        s = np.random.choice(range(21, features.shape[0] - 20), 80, replace=False)
+        s = np.random.choice(range(21, features.shape[0] - 20), 40, replace=False)
         s.sort()
         mid_f = features[s, :]
         last_f = features[-20:, :]
@@ -125,7 +125,7 @@ for i in range(10):
         features = np.load(prefix + '/train/train/' + str(train_label['Id']) + '.npy')
 
         if features.shape[0] > ml:
-            s = np.random.choice(range(21, features.shape[0] - 20), 80, replace=False)
+            s = np.random.choice(range(21, features.shape[0] - 20), 40, replace=False)
             s.sort()
             mid_f = features[s, :]
             last_f = features[-20:, :]
