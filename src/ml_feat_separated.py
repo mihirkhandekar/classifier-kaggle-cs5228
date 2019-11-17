@@ -38,7 +38,7 @@ from sklearn.ensemble import BaggingClassifier
 sparse_index = [i for i in range(40)]
 sparse_index = [i for i in sparse_index if i not in [0, 4, 10, 25]]
 
-prefix_path = '../data'
+prefix_path = 'data'
 labels = pd.read_csv(prefix_path + '/train_kaggle.csv')
 print('Labels', labels.describe())
 iterations = 6

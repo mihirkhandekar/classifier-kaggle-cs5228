@@ -37,27 +37,10 @@ from catboost import CatBoostClassifier
 sparse_index = [i for i in range(40)]
 sparse_index = [i for i in sparse_index if i not in [4, 10, 25]]
 
-prefix_path = '../data'
+prefix_path = 'data'
 labels = pd.read_csv(prefix_path + '/train_kaggle.csv')
 print('Labels', labels.describe())
 iterations = 6
-
-'''params = {'num_leaves': 491,
-          'min_child_weight': 0.03454472573214212,
-          'feature_fraction': 0.3797454081646243,
-          'bagging_fraction': 0.4181193142567742,
-          'min_data_in_leaf': 106,
-          'objective': 'binary',
-          'max_depth': -1,
-          'learning_rate': 0.006883242363721497,
-          "boosting_type": "gbdt",
-          "bagging_seed": 11,
-          "metric": 'auc',
-          "verbosity": -1,
-          'reg_alpha': 0.3899927210061127,
-          'reg_lambda': 0.6485237330340494,
-          'random_state': 47
-         }'''
 
 params = {
     'boosting_type': 'gbdt',
