@@ -17,12 +17,11 @@ from sklearn.utils import shuffle
 from keras.callbacks.callbacks import TerminateOnNaN, ReduceLROnPlateau, EarlyStopping
 
 prefix = 'data'
-labels = pd.read_csv(prefix + '/train_kaggle.csv')
+labels = pd.read_csv(f'{prefix}/train_kaggle.csv')
 
-sparse_index = [i for i in range(40)]
+sparse_index = list(range(40))
 def __preprocess_feature(feat):
-    sparse_x = feat[:, sparse_index]
-    return sparse_x
+    return feat[:, sparse_index]
 
 def generate_data(x_data, y_data, b_size):
     x_data = np.array(x_data)
@@ -76,15 +75,13 @@ def focal_loss(y_true, y_pred):
 def recall_m(y_true, y_pred):
     true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
     possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
-    recall = true_positives / (possible_positives + K.epsilon())
-    return recall
+    return true_positives / (possible_positives + K.epsilon())
 
 
 def precision_m(y_true, y_pred):
     true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
     predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
-    precision = true_positives / (predicted_positives + K.epsilon())
-    return precision
+    return true_positives / (predicted_positives + K.epsilon())
 
 
 def f1_m(y_true, y_pred):
@@ -95,9 +92,9 @@ def f1_m(y_true, y_pred):
 
 X_test = []
 for fileno in range(10000):
-    features = np.load(prefix + '/test/test/' + str(fileno) + '.npy')
+    features = np.load(f'{prefix}/test/test/{str(fileno)}.npy')
     zero_mat = np.zeros((ml, 40))
-    features = np.load(prefix + '/test/test/' + str(fileno) + '.npy')
+    features = np.load(f'{prefix}/test/test/{str(fileno)}.npy')
     if features.shape[0] > ml:
         s = np.random.choice(range(21, features.shape[0] - 20), 40, replace=False)
         s.sort()
@@ -122,7 +119,7 @@ for i in range(10):
             ones = ones - 0.85
         if ones <= 0 and label == 0:
             continue
-        features = np.load(prefix + '/train/train/' + str(train_label['Id']) + '.npy')
+        features = np.load(f'{prefix}/train/train/' + str(train_label['Id']) + '.npy')
 
         if features.shape[0] > ml:
             s = np.random.choice(range(21, features.shape[0] - 20), 40, replace=False)
@@ -176,6 +173,11 @@ for i in range(10):
 
 predictions = np.array(predictions)
 predictions = np.mean(predictions, axis=0)
-pred = pd.DataFrame(data=predictions, index=[i for i in range(predictions.shape[0])], columns=["Predicted"])
+pred = pd.DataFrame(
+    data=predictions,
+    index=list(range(predictions.shape[0])),
+    columns=["Predicted"],
+)
+
 pred.index.name = 'Id'
 pred.to_csv('outputs/dl-output.csv', index=True)

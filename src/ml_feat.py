@@ -34,11 +34,11 @@ from sklearn.utils import class_weight, shuffle
 from xgboost import XGBRegressor, XGBClassifier
 from catboost import CatBoostClassifier
 
-sparse_index = [i for i in range(40)]
+sparse_index = list(range(40))
 sparse_index = [i for i in sparse_index if i not in [4, 10, 25]]
 
 prefix_path = 'data'
-labels = pd.read_csv(prefix_path + '/train_kaggle.csv')
+labels = pd.read_csv(f'{prefix_path}/train_kaggle.csv')
 print('Labels', labels.describe())
 iterations = 6
 
@@ -59,21 +59,17 @@ params = {
 
 
 def __preprocess_feature(feat):
-    sparse_x = feat[:, sparse_index]
-    return sparse_x
+    return feat[:, sparse_index]
 
 
 def __get_model(lgb_train, lgb_eval, x_train, y_train):
-    model = gbm.train(params, 
-                      lgb_train,
-                      num_boost_round=400,
-                      valid_sets=lgb_eval,
-                      early_stopping_rounds=30)
-    return model
-    '''
-    clf = AdaBoostRegressor(n_estimators=500)
-    clf.fit(X, y)
-    return clf'''
+    return gbm.train(
+        params,
+        lgb_train,
+        num_boost_round=400,
+        valid_sets=lgb_eval,
+        early_stopping_rounds=30,
+    )
 
 
 def __extract_features(features, rand_indices):
@@ -113,16 +109,16 @@ for it in range(iterations):
     # Read test file
     test_X_features = []
     for fileno in range(10000):
-        test_features = np.load(prefix_path + '/test/test/' + str(fileno) + '.npy')
-        
+        test_features = np.load(f'{prefix_path}/test/test/{str(fileno)}.npy')
+
         sp_features = __extract_features(test_features, rand_indices)
-        
+
         test_X.append(sp_features)
         test_X_features.extend(test_features[:, 0])
 
     test_X = np.array(test_X)
     print('TEX shape', np.array(test_X_features).shape, np.unique(np.array(test_X_features)))
-    
+
     print('Starting Iteration ', it)
     X = []
     y = []
@@ -137,8 +133,10 @@ for it in range(iterations):
             ones = ones - 0.8
         if ones <= 0 and label == 0:
             continue
-        features = np.load(prefix_path + '/train/train/' +
-                           str(train_label['Id']) + '.npy')
+        features = np.load(
+            ((f'{prefix_path}/train/train/' + str(train_label['Id'])) + '.npy')
+        )
+
 
         sp_features = __extract_features(features, rand_indices)
         X.append(sp_features)

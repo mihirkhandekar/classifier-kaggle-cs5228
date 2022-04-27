@@ -35,11 +35,11 @@ from xgboost import XGBRegressor, XGBClassifier
 from catboost import CatBoostClassifier
 from sklearn.ensemble import BaggingClassifier
 
-sparse_index = [i for i in range(40)]
+sparse_index = list(range(40))
 sparse_index = [i for i in sparse_index if i not in [0, 4, 10, 25]]
 
 prefix_path = 'data'
-labels = pd.read_csv(prefix_path + '/train_kaggle.csv')
+labels = pd.read_csv(f'{prefix_path}/train_kaggle.csv')
 print('Labels', labels.describe())
 iterations = 6
 
@@ -75,17 +75,17 @@ ar_params = {
 
 
 def __preprocess_feature(feat):
-    sparse_x = feat[:, sparse_index]
-    return sparse_x
+    return feat[:, sparse_index]
 
 
 def __get_model(lgb_train, lgb_eval, x_train, y_train, param):
-    model = gbm.train(param, 
-                      lgb_train,
-                      num_boost_round=800,
-                      valid_sets=lgb_eval,
-                      early_stopping_rounds=60)
-    return model
+    return gbm.train(
+        param,
+        lgb_train,
+        num_boost_round=800,
+        valid_sets=lgb_eval,
+        early_stopping_rounds=60,
+    )
 
 
 def __extract_features(features):
@@ -119,6 +119,10 @@ max_time = 50
 
 
 
+test_X_0 = []
+test_X_1 = []
+test_X_n = []
+
 for it in range(iterations):    
     print('Starting Iteration ', it)
     X0 = []
@@ -138,8 +142,10 @@ for it in range(iterations):
             ones = ones - 0.65
         if ones <= 0 and label == 0:
             continue
-        features = np.load(prefix_path + '/train/train/' +
-                           str(train_label['Id']) + '.npy')
+        features = np.load(
+            ((f'{prefix_path}/train/train/' + str(train_label['Id'])) + '.npy')
+        )
+
 
         sp_features = __extract_features(features)
         if features[0][0] == 0:
@@ -156,13 +162,13 @@ for it in range(iterations):
 
     sel0 = VarianceThreshold(threshold=0.15)
     sel0.fit_transform(X0)
-    print('Variances0', [(num, item) for (num, item) in enumerate(sel0.variances_)])
+    print('Variances0', list(enumerate(sel0.variances_)))
     sel1 = VarianceThreshold(threshold=0.15)
     sel1.fit_transform(X1)
-    print('Variances1', [(num, item) for (num, item) in enumerate(sel0.variances_)])
+    print('Variances1', list(enumerate(sel0.variances_)))
     seln = VarianceThreshold(threshold=0.15)
     seln.fit_transform(Xn)
-    print('Variancesn', [(num, item) for (num, item) in enumerate(sel0.variances_)])
+    print('Variancesn', list(enumerate(sel0.variances_)))
 
     keep_feat = [index for index, variances in enumerate(zip(sel0.variances_, sel1.variances_, seln.variances_)) if variances[0] > 0.8 and variances[1] > 0.8 and variances[2] > 0.8]
 
@@ -170,12 +176,12 @@ for it in range(iterations):
 
     X0 = np.array(X0)[:, keep_feat]
     y0 = np.array(y0)
-    
+
 
     X1 = np.array(X1)[:, keep_feat]
     y1 = np.array(y1)
-    
-    
+
+
     Xn = np.array(Xn)[:, keep_feat]
     yn = np.array(yn)
 
@@ -189,7 +195,7 @@ for it in range(iterations):
     gbm_model_1 = __get_model(lgb_train_1, gbm.Dataset(x_val_1, y_val_1, reference=lgb_train_1), x_train_1, y_train_1, ar_params)
     lgb_train_n = gbm.Dataset(x_train_n, y_train_n)
     gbm_model_n = __get_model(lgb_train_n, gbm.Dataset(x_val_n, y_val_n, reference=lgb_train_n), x_train_n, y_train_n, params)
-    
+
     '''
     xgb_model_0 = XGBClassifier(alpha=4, base_score=0.5, booster='gbtree', colsample_bylevel=1,
               colsample_bynode=1, colsample_bytree=0.9, gamma=0.1,
@@ -246,7 +252,7 @@ for it in range(iterations):
     #bag_model_1.fit(x_train_1, y_train_1, sample_weight=sample_weight)
     '''
 
-    y_pred_0 = gbm_model_0.predict(x_val_0) 
+    y_pred_0 = gbm_model_0.predict(x_val_0)
     xg_predictions_0 = [int(round(value)) for value in y_pred_0]
 
     y_pred_1 = gbm_model_1.predict(x_val_1)
@@ -256,36 +262,29 @@ for it in range(iterations):
     y_pred_n = gbm_model_n.predict(x_val_n)
     xg_predictions_n = [int(round(value)) for value in y_pred_n]
 
-    test_X_0 = []
-    test_X_1 = []
-    test_X_n = []
-    
     y_test_dl = []
     count_0 = 0
     count_1 = 0
     count_n = 0
     for fileno in range(10000):
-        test_features = np.load(prefix_path + '/test/test/' + str(fileno) + '.npy')
-        
+        test_features = np.load(f'{prefix_path}/test/test/{str(fileno)}.npy')
+
         sp_features = __extract_features(test_features)
         tX = np.array([sp_features])[:, keep_feat]
         if test_features[0][0] == 0:
             prediction = gbm_model_0.predict(tX)
-            y_test_dl.extend(prediction)
             count_0 += 1
         elif test_features[0][0] == 1:
             prediction = gbm_model_1.predict(tX)
-            # prediction = gbm_model_1.predict(tX)
-            y_test_dl.extend(prediction)
             count_1 += 1
         else:
             prediction = gbm_model_n.predict(tX)
-            y_test_dl.extend(prediction)
             count_n += 1
 
+        y_test_dl.extend(prediction)
     test_Y.append(y_test_dl)
 
-    print('### . 0={}, 1={}, n={}'.format(count_0, count_1, count_n))
+    print(f'### . 0={count_0}, 1={count_1}, n={count_n}')
 
     print('0 Round validation ROC-AUC = {}, accuracy = {}, recall = {}, precision = {}'.format(roc_auc_score(y_val_0, y_pred_0),
                                                                                             accuracy_score(y_val_0, xg_predictions_0), recall_score(
@@ -310,4 +309,4 @@ print(test_Y.shape, test_Y)
 
 df = pd.DataFrame()
 df["Predicted"] = test_Y
-df.to_csv('outputs/ml-output-' + str(time.time()) + '.csv', index_label="Id")
+df.to_csv(f'outputs/ml-output-{str(time.time())}.csv', index_label="Id")

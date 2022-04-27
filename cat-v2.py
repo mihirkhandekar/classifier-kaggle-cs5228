@@ -22,7 +22,7 @@ import time
 ## Below path hardcoded. TODO: Change this
 prefix_path = 'data1'
 
-labels = pd.read_csv(prefix_path + '/train_kaggle.csv')
+labels = pd.read_csv(f'{prefix_path}/train_kaggle.csv')
 
 print('Labels', labels.describe())
 
@@ -31,7 +31,7 @@ iterations = 6
 test_X = []
 
 # parse_index = [0, 2, 1, 4, 6, 8, 9, 10, 14, 16, 19, 21, 22, 23, 25, 26, 27, 28, 30, 31, 32, 33, 34, 36, 38]
-sparse_index = [i for i in range(40)]
+sparse_index = list(range(40))
 # sparse_index = [i for i in sparse_index if i not in [4, 10, 25]]
 dense_index = [2, 3, 5, 7, 11, 12, 13, 15, 17, 18, 20, 24, 29, 33, 35, 37, 39]
 
@@ -46,7 +46,7 @@ def __preprocess_feature(feat):
 
 for fileno in range(10000):
     ## features is a (N, 40) matrix
-    features = np.load(prefix_path + '/test/test/' + str(fileno) + '.npy')
+    features = np.load(f'{prefix_path}/test/test/{str(fileno)}.npy')
 
     sparse_x, dense_x = __preprocess_feature(np.array(features))
 
@@ -67,21 +67,21 @@ test_set_results = []
 
 incorrect_x = None
 
+X = []
+max_len = 340
+batch_size = 512
+zero_test = []
+zero_test_y = []
 for it in range(iterations):
     print('Starting Iteration ', it)
-    X = []
     y = []
     ## ones count kept to balance number of zeros and ones in data to be equal
     ones = len(labels.loc[labels['label'] == 1])
 
-    max_len = 340
-    batch_size = 512
     shuffled_labels = shuffle(labels)
     shuffled_y = np.array(shuffled_labels['label'])
     ## For each sample in the file
     X_sparse = []
-    zero_test = []
-    zero_test_y = []
     for index, train_label in shuffled_labels.iterrows():
         label = train_label['label']
         ## Checking below if number of zeros matches total number of ones, then stop adding zeros to data
@@ -90,7 +90,10 @@ for it in range(iterations):
         if ones <= 0 and label == 0:
             continue
         ## features is a (N, 40) matrix
-        features = np.load(prefix_path + '/train/train/' + str(train_label['Id']) + '.npy')
+        features = np.load(
+            f'{prefix_path}/train/train/' + str(train_label['Id']) + '.npy'
+        )
+
 
         sparse_x, dense_x = __preprocess_feature(features)
 
@@ -172,4 +175,4 @@ import pandas as pd
 
 df = pd.DataFrame()
 df["Predicted"] = final_y
-df.to_csv('lgbm_200-' + str(time.time()) + '.csv', index_label="Id")
+df.to_csv(f'lgbm_200-{str(time.time())}.csv', index_label="Id")
